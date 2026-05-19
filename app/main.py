@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from src.config import get_settings
 from src.domain.health.controller import router as health_router
 from src.domain.registration.controller import router as registration_router
+from src.domain.slot.controller import router as slot_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -28,3 +29,4 @@ app = FastAPI(
 
 app.include_router(health_router)
 app.include_router(registration_router)
+app.include_router(slot_router)
