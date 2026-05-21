@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .enums import RegistrationStatus
+
 
 # ---------------------------------------------------------------------------
 # Schemas legados (mantidos para compatibilidade com POST /register)
@@ -19,8 +21,9 @@ class RegistrationCreateRequest(BaseModel):
 class RegistrationResponse(BaseModel):
     eventId: UUID
     userId: UUID
-    registrationTimestamp: datetime
-    confirmationTimestamp: datetime | None = None
+    status: RegistrationStatus
+    createdAt: datetime
+    updatedAt: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,11 +51,14 @@ class AvailableEventResponse(BaseModel):
 class GuestRegistrationResponse(BaseModel):
     """Representa um convidado inscrito em um evento."""
 
-    registrationId: UUID = Field(..., description="ID da inscrição")
     eventId: UUID = Field(..., description="ID do evento")
     userId: UUID = Field(..., description="ID do usuário inscrito")
-    registrationTimestamp: datetime = Field(..., description="Data/hora da inscrição")
-    confirmationTimestamp: datetime | None = Field(None, description="Data/hora de confirmação, se houver")
+    status: RegistrationStatus = Field(..., description="Status atual da inscrição")
+    createdAt: datetime = Field(..., description="Data/hora de criação da inscrição")
+    updatedAt: datetime | None = Field(
+        None,
+        description="Data/hora da última atualização da inscrição, se houver",
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,8 +92,8 @@ class CheckInStatusResponse(BaseModel):
         ...,
         description="Indica se a inscrição foi confirmada pelo usuário (e-mail/token)",
     )
-    registrationTimestamp: datetime | None = Field(
-        None, description="Data/hora da inscrição, se existir"
+    createdAt: datetime | None = Field(
+        None, description="Data/hora da criação da inscrição, se existir"
     )
 
 
@@ -97,15 +103,15 @@ class CheckInStatusResponse(BaseModel):
 
 
 class ConfirmationCodeRequest(BaseModel):
-    """Payload para confirmar uma inscrição via código alfanumérico."""
+    """Payload para confirmar uma inscrição via token alfanumérico."""
 
-    codigo: str = Field(
+    token: str = Field(
         ...,
-        min_length=6,
+        min_length=8,
         max_length=8,
-        pattern=r"^[A-Za-z0-9]{6,8}$",
-        description="Código alfanumérico de 6 ou 8 caracteres enviado ao usuário",
-        examples=["AB12CD", "XY34ZW78"],
+        pattern=r"^[A-Za-z0-9]{8}$",
+        description="Token alfanumérico de 8 caracteres enviado ao usuário",
+        examples=["XY34ZW78"],
     )
 
 

@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from .schemas import (
     AvailableEventResponse,
@@ -11,9 +11,33 @@ from .schemas import (
     ConfirmationResponse,
     GuestRegistrationRequest,
     GuestRegistrationResponse,
+    RegistrationCreateRequest,
+    RegistrationResponse,
 )
+from .service import RegistrationService, get_registration_service
 
 router = APIRouter(tags=["registration"])
+
+
+@router.post(
+    "/register",
+    response_model=RegistrationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Cria uma inscrição",
+    description="Cria uma inscrição para o par usuário/evento informado.",
+)
+def register(
+    body: RegistrationCreateRequest,
+    service: RegistrationService = Depends(get_registration_service),
+) -> RegistrationResponse:
+    registration = service.register(body.eventId, body.userId)
+    return RegistrationResponse(
+        eventId=registration.event_id,
+        userId=registration.user_id,
+        status=registration.status,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
+    )
 
 
 
@@ -159,36 +183,38 @@ def validate_check_in(
     status_code=status.HTTP_200_OK,
     summary="Confirma a inscrição de um usuário em um evento",
     description=(
-        "Valida o código alfanumérico enviado pelo usuário para confirmar sua inscrição. "
-        "O `confirmation_id` identifica o registro na tabela auxiliar `confirmation_tokens`. "
-        "O código deve ter entre 6 e 8 caracteres alfanuméricos (gerado automaticamente pelo backend). "
+        "Valida o token alfanumérico enviado pelo usuário para confirmar sua inscrição. "
+        "O `confirmation_id` identifica o registro de token de validação do domínio de registration "
+        "armazenado na tabela auxiliar `authentication_tokens`. "
+        "O token deve ter exatamente 8 caracteres alfanuméricos (gerado automaticamente pelo backend). "
         "\n\n**Erros tratados:**\n"
         "- `404 Not Found`: `confirmation_id` não existe na tabela.\n"
-        "- `400 Bad Request`: código informado está incorreto.\n"
+        "- `400 Bad Request`: token informado está incorreto.\n"
         "- `410 Gone`: o código expirou (`expires_at` ultrapassado).\n"
-        "- `409 Conflict`: a inscrição já foi confirmada anteriormente (`updated_at` preenchido).\n"
-        "- `422 Unprocessable Entity`: campo `codigo` ausente ou fora do formato esperado (validado pelo Pydantic)."
+        "- `409 Conflict`: a inscrição já foi confirmada anteriormente (`status = CONFIRMED`).\n"
+        "- `422 Unprocessable Entity`: campo `token` ausente ou fora do formato esperado (validado pelo Pydantic)."
     ),
     responses={
-        400: {"description": "Código incorreto"},
+        400: {"description": "Token incorreto"},
         404: {"description": "confirmation_id não encontrado"},
         409: {"description": "Inscrição já confirmada anteriormente"},
-        410: {"description": "Código expirado"},
+        410: {"description": "Token expirado"},
     },
 )
 def confirm_registration(
     confirmation_id: UUID,
     body: ConfirmationCodeRequest,
 ) -> ConfirmationResponse:
-    # TODO: buscar o registro pelo confirmation_id na tabela confirmation_tokens
+    # TODO: buscar o token de validação pelo confirmation_id na tabela authentication_tokens
     #   → 404 se não existir
     # TODO: verificar se expires_at < now()
     #   → 410 Gone se expirado
-    # TODO: verificar se updated_at já está preenchido
+    # TODO: verificar se a inscrição correspondente já está com status CONFIRMED
     #   → 409 Conflict se já confirmado
-    # TODO: comparar body.codigo com o campo `codigo` do registro
+    # TODO: comparar body.token com o campo `token` do registro
     #   → 400 Bad Request se divergir
-    # TODO: preencher updated_at = now() e atualizar confirmation_timestamp na tabela registrations
+    # TODO: atualizar status = CONFIRMED na tabela registrations
+    #   → updated_at deve ser preenchido automaticamente
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="Endpoint ainda não implementado.",

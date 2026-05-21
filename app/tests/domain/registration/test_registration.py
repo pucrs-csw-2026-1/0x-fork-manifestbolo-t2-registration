@@ -1,14 +1,16 @@
 """Tests for event registration."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from src.domain.registration.model import Registration
+from src.database import Base
+from src.domain.registration.model import Registration, ValidationToken
 from src.domain.registration.repository import RegistrationRepository
 from src.domain.registration.service import RegistrationService
+from src.domain.registration.enums import RegistrationStatus
 
 
 def test_register_endpoint_creates_registration(client: TestClient) -> None:
@@ -21,8 +23,9 @@ def test_register_endpoint_creates_registration(client: TestClient) -> None:
     payload = response.json()
     assert payload["eventId"] == event_id
     assert payload["userId"] == user_id
-    assert payload["registrationTimestamp"] is not None
-    assert payload["confirmationTimestamp"] is None
+    assert payload["status"] == RegistrationStatus.REGISTERED.value
+    assert payload["createdAt"] is not None
+    assert payload["updatedAt"] is None
 
 
 def test_registration_repository_persists_row(db_session: Session) -> None:
@@ -34,8 +37,9 @@ def test_registration_repository_persists_row(db_session: Session) -> None:
 
     assert registration.event_id == event_id
     assert registration.user_id == user_id
-    assert registration.registration_timestamp is not None
-    assert registration.confirmation_timestamp is None
+    assert registration.status == RegistrationStatus.REGISTERED
+    assert registration.created_at is not None
+    assert registration.updated_at is None
 
 
 def test_registration_service_rejects_duplicates(db_session: Session) -> None:
@@ -59,7 +63,26 @@ def test_registration_model_defaults_timestamp(db_session: Session) -> None:
     db_session.add(registration)
     db_session.commit()
 
-    assert registration.registration_timestamp is not None
-    assert isinstance(registration.registration_timestamp, datetime)
-    assert registration.registration_timestamp.tzinfo is not None
-    assert registration.confirmation_timestamp is None
+    assert registration.status == RegistrationStatus.REGISTERED
+    assert registration.created_at is not None
+    assert isinstance(registration.created_at, datetime)
+    assert registration.created_at.tzinfo is not None
+    assert registration.updated_at is None
+
+
+def test_registration_updated_at_is_populated_on_update(db_session: Session) -> None:
+    registration = Registration(event_id=uuid4(), user_id=uuid4())
+    db_session.add(registration)
+    db_session.commit()
+
+    registration.status = RegistrationStatus.CONFIRMED
+    db_session.commit()
+    db_session.refresh(registration)
+
+    assert registration.status == RegistrationStatus.CONFIRMED
+    assert registration.updated_at is not None
+
+
+def test_validation_token_belongs_to_registration_domain_metadata() -> None:
+    assert ValidationToken.__table__.name == "authentication_tokens"
+    assert Base.metadata.tables["authentication_tokens"] is ValidationToken.__table__
