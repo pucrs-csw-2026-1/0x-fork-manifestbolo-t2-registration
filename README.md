@@ -217,7 +217,7 @@ Registration ──1:1──► ConfirmationToken
 
 ## Arquitetura
 
-Este serviço segue a decisão registrada em [ADR-0001](documentation/adrs/0001-separacao-clients-http-por-microsservico-externo.md): cada microsserviço externo tem um domínio isolado com `client.py` e `schemas.py` dedicados.
+Este serviço segue a decisão registrada em [ADR-0001](./app/documentation/adrs/0001-separacao-clients-http-por-microsservico-externo.md): cada microsserviço externo tem um domínio isolado com `client.py` e `schemas.py` dedicados.
 
 ```
 src/domain/
