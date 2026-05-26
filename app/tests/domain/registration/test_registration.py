@@ -7,10 +7,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from src.database import Base
+from src.domain.registration.enums import RegistrationStatus
 from src.domain.registration.model import Registration, ValidationToken
 from src.domain.registration.repository import RegistrationRepository
 from src.domain.registration.service import RegistrationService
-from src.domain.registration.enums import RegistrationStatus
 
 
 def test_register_endpoint_creates_registration(client: TestClient) -> None:

@@ -7,25 +7,26 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import RegistrationStatus
 
-
 # ---------------------------------------------------------------------------
 # Schemas legados (mantidos para compatibilidade com POST /register)
 # ---------------------------------------------------------------------------
 
 
 class RegistrationCreateRequest(BaseModel):
-    eventId: UUID
-    userId: UUID
+    event_id: UUID = Field(..., alias="eventId")
+    user_id: UUID = Field(..., alias="userId")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class RegistrationResponse(BaseModel):
-    eventId: UUID
-    userId: UUID
+    event_id: UUID = Field(..., alias="eventId")
+    user_id: UUID = Field(..., alias="userId")
     status: RegistrationStatus
-    createdAt: datetime
-    updatedAt: datetime | None = None
+    created_at: datetime = Field(..., alias="createdAt")
+    updated_at: datetime | None = Field(None, alias="updatedAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -36,11 +37,25 @@ class RegistrationResponse(BaseModel):
 class AvailableEventResponse(BaseModel):
     """Representa um evento com vagas ainda abertas para inscrição."""
 
-    eventId: UUID = Field(..., description="ID único do evento")
+    event_id: UUID = Field(..., alias="eventId", description="ID único do evento")
     name: str = Field(..., description="Nome do evento")
-    maxCapacity: int = Field(..., description="Capacidade máxima de inscritos")
-    registeredCount: int = Field(..., description="Número atual de inscritos (neste serviço)")
-    availableSlots: int = Field(..., description="Vagas restantes (maxCapacity - registeredCount)")
+    max_capacity: int = Field(
+        ...,
+        alias="maxCapacity",
+        description="Capacidade máxima de inscritos",
+    )
+    registered_count: int = Field(
+        ...,
+        alias="registeredCount",
+        description="Número atual de inscritos (neste serviço)",
+    )
+    available_slots: int = Field(
+        ...,
+        alias="availableSlots",
+        description="Vagas restantes (maxCapacity - registeredCount)",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -51,16 +66,21 @@ class AvailableEventResponse(BaseModel):
 class GuestRegistrationResponse(BaseModel):
     """Representa um convidado inscrito em um evento."""
 
-    eventId: UUID = Field(..., description="ID do evento")
-    userId: UUID = Field(..., description="ID do usuário inscrito")
+    event_id: UUID = Field(..., alias="eventId", description="ID do evento")
+    user_id: UUID = Field(..., alias="userId", description="ID do usuário inscrito")
     status: RegistrationStatus = Field(..., description="Status atual da inscrição")
-    createdAt: datetime = Field(..., description="Data/hora de criação da inscrição")
-    updatedAt: datetime | None = Field(
+    created_at: datetime = Field(
+        ...,
+        alias="createdAt",
+        description="Data/hora de criação da inscrição",
+    )
+    updated_at: datetime | None = Field(
         None,
+        alias="updatedAt",
         description="Data/hora da última atualização da inscrição, se houver",
     )
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +91,13 @@ class GuestRegistrationResponse(BaseModel):
 class GuestRegistrationRequest(BaseModel):
     """Payload para inscrever um convidado em um evento."""
 
-    userId: UUID = Field(..., description="ID do usuário a ser inscrito como convidado")
+    user_id: UUID = Field(
+        ...,
+        alias="userId",
+        description="ID do usuário a ser inscrito como convidado",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -82,19 +108,25 @@ class GuestRegistrationRequest(BaseModel):
 class CheckInStatusResponse(BaseModel):
     """Resposta da validação de inscrição para o microsserviço de check-in."""
 
-    eventId: UUID = Field(..., description="ID do evento")
-    userId: UUID = Field(..., description="ID do usuário consultado")
-    isRegistered: bool = Field(
+    event_id: UUID = Field(..., alias="eventId", description="ID do evento")
+    user_id: UUID = Field(..., alias="userId", description="ID do usuário consultado")
+    is_registered: bool = Field(
         ...,
+        alias="isRegistered",
         description="Indica se o usuário possui inscrição ativa no evento",
     )
-    isConfirmed: bool = Field(
+    is_confirmed: bool = Field(
         ...,
+        alias="isConfirmed",
         description="Indica se a inscrição foi confirmada pelo usuário (e-mail/token)",
     )
-    createdAt: datetime | None = Field(
-        None, description="Data/hora da criação da inscrição, se existir"
+    created_at: datetime | None = Field(
+        None,
+        alias="createdAt",
+        description="Data/hora da criação da inscrição, se existir",
     )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +150,17 @@ class ConfirmationCodeRequest(BaseModel):
 class ConfirmationResponse(BaseModel):
     """Resposta após confirmação bem-sucedida de uma inscrição."""
 
-    confirmationId: UUID = Field(..., description="ID da solicitação de confirmação")
-    eventId: UUID = Field(..., description="ID do evento confirmado")
-    userId: UUID = Field(..., description="ID do usuário que confirmou")
-    confirmedAt: datetime = Field(..., description="Data/hora em que a confirmação foi registrada")
+    confirmation_id: UUID = Field(
+        ...,
+        alias="confirmationId",
+        description="ID da solicitação de confirmação",
+    )
+    event_id: UUID = Field(..., alias="eventId", description="ID do evento confirmado")
+    user_id: UUID = Field(..., alias="userId", description="ID do usuário que confirmou")
+    confirmed_at: datetime = Field(
+        ...,
+        alias="confirmedAt",
+        description="Data/hora em que a confirmação foi registrada",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)

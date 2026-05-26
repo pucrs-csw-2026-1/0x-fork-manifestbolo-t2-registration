@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from src.config import get_settings
 from src.domain.health.controller import router as health_router
 from src.domain.health.model import HealthLog
-from src.domain.registration.model import Registration, ValidationToken
 from src.domain.registration.controller import router as registration_router
+from src.domain.registration.model import Registration, ValidationToken
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

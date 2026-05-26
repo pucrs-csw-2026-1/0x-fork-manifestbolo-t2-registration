@@ -30,13 +30,13 @@ def register(
     body: RegistrationCreateRequest,
     service: RegistrationService = Depends(get_registration_service),
 ) -> RegistrationResponse:
-    registration = service.register(body.eventId, body.userId)
+    registration = service.register(body.event_id, body.user_id)
     return RegistrationResponse(
-        eventId=registration.event_id,
-        userId=registration.user_id,
+        event_id=registration.event_id,
+        user_id=registration.user_id,
         status=registration.status,
-        createdAt=registration.created_at,
-        updatedAt=registration.updated_at,
+        created_at=registration.created_at,
+        updated_at=registration.updated_at,
     )
 
 
