@@ -3,8 +3,8 @@
 from datetime import datetime
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy.orm import Session
 
 from src.domain.registration.model import Registration
