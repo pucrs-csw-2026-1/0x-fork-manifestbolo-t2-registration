@@ -188,8 +188,6 @@ ruff check . --fix    # aplica lint + ordena imports (regra I001)
 ruff format .         # formata o código (aspas, espaços, quebras de linha)
 ```
 
-> Importante: `ruff format` **não ordena imports** — quem faz isso é `ruff check` (regra `I001`). Sempre rode os dois.
-
 Para apenas validar (sem alterar arquivos), como faz o CI:
 
 ```bash
