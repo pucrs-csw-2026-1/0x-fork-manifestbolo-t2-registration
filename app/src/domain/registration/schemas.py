@@ -156,7 +156,9 @@ class ConfirmationResponse(BaseModel):
         description="ID da solicitação de confirmação",
     )
     event_id: UUID = Field(..., alias="eventId", description="ID do evento confirmado")
-    user_id: UUID = Field(..., alias="userId", description="ID do usuário que confirmou")
+    user_id: UUID = Field(
+        ..., alias="userId", description="ID do usuário que confirmou"
+    )
     confirmed_at: datetime = Field(
         ...,
         alias="confirmedAt",

@@ -85,4 +85,6 @@ class ValidationToken(Base):
         server_default=text("CURRENT_TIMESTAMP"),
         nullable=False,
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
