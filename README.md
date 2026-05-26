@@ -174,3 +174,27 @@ src/domain/
     ├── schemas.py
     └── service.py     ← orquestra AuthClient e EventsClient via injeção
 ```
+
+---
+
+## Lint e Formatação (Ruff)
+
+O projeto usa [Ruff](https://docs.astral.sh/ruff/) para lint e formatação. A configuração está em [`app/pyproject.toml`](./app/pyproject.toml) (regras `E`, `F`, `I`, `N`, `UP`, `B`, `SIM` com `force-sort-within-sections = true` para o isort).
+
+**Antes de qualquer `git push`**, rode os dois comandos a partir da pasta `app/`:
+
+```bash
+ruff check . --fix    # aplica lint + ordena imports (regra I001)
+ruff format .         # formata o código (aspas, espaços, quebras de linha)
+```
+
+> Importante: `ruff format` **não ordena imports** — quem faz isso é `ruff check` (regra `I001`). Sempre rode os dois.
+
+Para apenas validar (sem alterar arquivos), como faz o CI:
+
+```bash
+ruff check .
+ruff format --check .
+```
+
+A pipeline do GitHub Actions roda `ruff check app/ --output-format=github` e falha o build se houver qualquer erro — então é mais rápido corrigir localmente antes de pushar.
