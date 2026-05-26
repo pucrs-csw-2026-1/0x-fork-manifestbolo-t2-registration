@@ -3,6 +3,7 @@ from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 # defines the configuration for the application, each field contains the type and a default value that are overwritten by the environment variables (handled by pydantic).
 # Meaning that, if you need to change the value of a field, change it in the .env file and keep this file as it is, unless the structure of the environment variables changes, in that case, you will need to change the structure of this file as well.
 class Settings(BaseSettings):

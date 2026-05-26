@@ -11,7 +11,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # EXEMPLO — adapte conforme o contrato real do microsserviço de eventos
 # ---------------------------------------------------------------------------
