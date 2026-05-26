@@ -43,6 +43,7 @@ def pg_engine() -> Generator[Engine, None, None]:
 # Isolated session — each test runs inside a transaction that is rolled back.
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def db_session(pg_engine: Engine) -> Generator[Session, None, None]:
     """Provide an isolated Postgres session via nested transaction rollback per test.
@@ -75,14 +76,10 @@ def db_session(pg_engine: Engine) -> Generator[Session, None, None]:
 # FastAPI test client with DB override.
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
-def client(db_session: Session, pg_engine: Engine) -> Generator[TestClient, None, None]:
-    """Provide a FastAPI test client with database dependency override."""
-    import main as main_module
 
-    test_session_factory = sessionmaker(bind=pg_engine, autocommit=False, autoflush=False)
-    original_session_local = main_module.SessionLocal
-    main_module.SessionLocal = test_session_factory
+@pytest.fixture()
+def client(db_session: Session) -> Generator[TestClient, None, None]:
+    """Provide a FastAPI test client with database dependency override."""
 
     def _override_get_db() -> Generator[Session, None, None]:
         yield db_session
@@ -93,12 +90,12 @@ def client(db_session: Session, pg_engine: Engine) -> Generator[TestClient, None
             yield test_client
     finally:
         app.dependency_overrides.clear()
-        main_module.SessionLocal = original_session_local
 
 
 # ---------------------------------------------------------------------------
 # AWS mock
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def aws_mock() -> Generator[None, None, None]:
@@ -110,6 +107,7 @@ def aws_mock() -> Generator[None, None, None]:
 # ---------------------------------------------------------------------------
 # Faker — randomized test data for each test run.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def fake() -> Faker:

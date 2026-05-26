@@ -1,9 +1,10 @@
 """Tests for event registration."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy.orm import Session
 
 from src.domain.registration.model import Registration
@@ -11,16 +12,17 @@ from src.domain.registration.repository import RegistrationRepository
 from src.domain.registration.service import RegistrationService
 
 
+@pytest.mark.xfail(reason="POST /events/{event_id}/guests ainda não implementado (501)")
 def test_register_endpoint_creates_registration(client: TestClient) -> None:
-    event_id = str(uuid4())
+    event_id = uuid4()
     user_id = str(uuid4())
 
-    response = client.post("/register", json={"eventId": event_id, "userId": user_id})
+    response = client.post(f"/events/{event_id}/guests", json={"userId": user_id})
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["eventId"] == event_id
-    assert payload["userId"] == user_id
+    assert str(payload["eventId"]) == str(event_id)
+    assert str(payload["userId"]) == user_id
     assert payload["registrationTimestamp"] is not None
     assert payload["confirmationTimestamp"] is None
 

@@ -5,7 +5,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # Schemas legados (mantidos para compatibilidade com POST /register)
 # ---------------------------------------------------------------------------
@@ -36,8 +35,12 @@ class AvailableEventResponse(BaseModel):
     eventId: UUID = Field(..., description="ID único do evento")
     name: str = Field(..., description="Nome do evento")
     maxCapacity: int = Field(..., description="Capacidade máxima de inscritos")
-    registeredCount: int = Field(..., description="Número atual de inscritos (neste serviço)")
-    availableSlots: int = Field(..., description="Vagas restantes (maxCapacity - registeredCount)")
+    registeredCount: int = Field(
+        ..., description="Número atual de inscritos (neste serviço)"
+    )
+    availableSlots: int = Field(
+        ..., description="Vagas restantes (maxCapacity - registeredCount)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +55,9 @@ class GuestRegistrationResponse(BaseModel):
     eventId: UUID = Field(..., description="ID do evento")
     userId: UUID = Field(..., description="ID do usuário inscrito")
     registrationTimestamp: datetime = Field(..., description="Data/hora da inscrição")
-    confirmationTimestamp: datetime | None = Field(None, description="Data/hora de confirmação, se houver")
+    confirmationTimestamp: datetime | None = Field(
+        None, description="Data/hora de confirmação, se houver"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -115,4 +120,6 @@ class ConfirmationResponse(BaseModel):
     confirmationId: UUID = Field(..., description="ID da solicitação de confirmação")
     eventId: UUID = Field(..., description="ID do evento confirmado")
     userId: UUID = Field(..., description="ID do usuário que confirmou")
-    confirmedAt: datetime = Field(..., description="Data/hora em que a confirmação foi registrada")
+    confirmedAt: datetime = Field(
+        ..., description="Data/hora em que a confirmação foi registrada"
+    )

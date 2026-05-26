@@ -16,7 +16,6 @@ from .schemas import (
 router = APIRouter(tags=["registration"])
 
 
-
 # ---------------------------------------------------------------------------
 # GET /events/available – eventos com vagas disponíveis
 # ---------------------------------------------------------------------------
