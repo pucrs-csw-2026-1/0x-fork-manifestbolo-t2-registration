@@ -39,8 +39,12 @@ class AvailableEventResponse(BaseModel):
     eventId: UUID = Field(..., description="ID único do evento")
     name: str = Field(..., description="Nome do evento")
     maxCapacity: int = Field(..., description="Capacidade máxima de inscritos")
-    registeredCount: int = Field(..., description="Número atual de inscritos (neste serviço)")
-    availableSlots: int = Field(..., description="Vagas restantes (maxCapacity - registeredCount)")
+    registeredCount: int = Field(
+        ..., description="Número atual de inscritos (neste serviço)"
+    )
+    availableSlots: int = Field(
+        ..., description="Vagas restantes (maxCapacity - registeredCount)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -121,4 +125,6 @@ class ConfirmationResponse(BaseModel):
     confirmationId: UUID = Field(..., description="ID da solicitação de confirmação")
     eventId: UUID = Field(..., description="ID do evento confirmado")
     userId: UUID = Field(..., description="ID do usuário que confirmou")
-    confirmedAt: datetime = Field(..., description="Data/hora em que a confirmação foi registrada")
+    confirmedAt: datetime = Field(
+        ..., description="Data/hora em que a confirmação foi registrada"
+    )
