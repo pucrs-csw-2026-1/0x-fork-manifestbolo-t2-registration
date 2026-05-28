@@ -18,7 +18,7 @@ from src.database import Base  # noqa: E402
 from src.domain.health.model import HealthLog  # noqa: E402
 from src.domain.registration.model import Registration  # noqa: E402
 
-MODEL_TYPES = (HealthLog, Registration)
+MODEL_TYPES = (HealthLog, Registration, ActivityRegistration)
 
 config = context.config
 settings = get_settings()
