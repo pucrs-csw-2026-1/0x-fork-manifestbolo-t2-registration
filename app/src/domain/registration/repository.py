@@ -27,6 +27,14 @@ class RegistrationRepository:
             .first()
         )
 
+    def list_by_event(self, event_id: UUID) -> list[Registration]:
+        return (
+            self.db.query(Registration)
+            .filter(Registration.event_id == event_id)
+            .order_by(Registration.created_at)
+            .all()
+        )
+
     def create(self, event_id: UUID, user_id: UUID) -> Registration:
         registration = Registration(event_id=event_id, user_id=user_id)
         self.db.add(registration)
