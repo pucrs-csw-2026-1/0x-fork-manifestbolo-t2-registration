@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     String,
     text,
+    Index
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator, Uuid

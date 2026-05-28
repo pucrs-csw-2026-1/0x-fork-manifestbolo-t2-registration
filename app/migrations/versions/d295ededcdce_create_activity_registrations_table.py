@@ -11,8 +11,8 @@ from collections.abc import Sequence
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "f6a7b8c9d0e1"
-down_revision: str | None = "e5f6a7b8c9d0"
+revision: str = "d295ededcdce"
+down_revision: str | None = "f6a7b8c9d0e1"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

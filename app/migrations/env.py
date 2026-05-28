@@ -16,7 +16,7 @@ if str(APP_ROOT) not in sys.path:
 from src.config import get_settings  # noqa: E402
 from src.database import Base  # noqa: E402
 from src.domain.health.model import HealthLog  # noqa: E402
-from src.domain.registration.model import Registration  # noqa: E402
+from src.domain.registration.model import Registration, ActivityRegistration  # noqa: E402
 
 MODEL_TYPES = (HealthLog, Registration, ActivityRegistration)
 
