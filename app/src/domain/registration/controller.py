@@ -32,11 +32,11 @@ def register(
 ) -> RegistrationResponse:
     registration = service.register(body.event_id, body.user_id)
     return RegistrationResponse(
-        event_id=registration.event_id,
-        user_id=registration.user_id,
+        eventId=registration.event_id,
+        userId=registration.user_id,
         status=registration.status,
-        created_at=registration.created_at,
-        updated_at=registration.updated_at,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
     )
 
 
@@ -163,11 +163,22 @@ def cancel_guest_registration(
 def validate_check_in(
     event_id: UUID,
     user_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
 ) -> CheckInStatusResponse:
-    # TODO: consultar a inscrição no repositório local pelo par (event_id, user_id)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
+    registration = service.get_check_in_registration(event_id, user_id)
+
+    if registration is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Registration not found.",
+        )
+
+    return CheckInStatusResponse(
+        eventId=event_id,
+        userId=user_id,
+        status=registration.status,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
     )
 
 
