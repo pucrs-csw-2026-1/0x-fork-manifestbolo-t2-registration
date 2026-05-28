@@ -85,7 +85,9 @@ def test_registration_updated_at_is_populated_on_update(db_session: Session) -> 
     assert registration.updated_at is not None
 
 
-def test_validate_check_in_returns_registration_state(client: TestClient, db_session: Session) -> None:
+def test_validate_check_in_returns_registration_state(
+    client: TestClient, db_session: Session
+) -> None:
     event_id = uuid4()
     user_id = uuid4()
     registration = Registration(
