@@ -85,6 +85,41 @@ def test_registration_updated_at_is_populated_on_update(db_session: Session) -> 
     assert registration.updated_at is not None
 
 
+def test_validate_check_in_returns_registration_state(
+    client: TestClient, db_session: Session
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    registration = Registration(
+        event_id=event_id,
+        user_id=user_id,
+        status=RegistrationStatus.CONFIRMED,
+    )
+    db_session.add(registration)
+    db_session.commit()
+
+    response = client.get(f"/events/{event_id}/guests/{user_id}/check-in")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["eventId"] == str(event_id)
+    assert payload["userId"] == str(user_id)
+    assert payload["status"] == RegistrationStatus.CONFIRMED.value
+    assert payload["createdAt"] is not None
+    assert payload["updatedAt"] is None
+
+
+def test_validate_check_in_returns_false_for_missing_registration(
+    client: TestClient,
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+
+    response = client.get(f"/events/{event_id}/guests/{user_id}/check-in")
+
+    assert response.status_code == 404
+
+
 def test_validation_token_belongs_to_registration_domain_metadata() -> None:
     assert ValidationToken.__table__.name == "authentication_tokens"
     assert Base.metadata.tables["authentication_tokens"] is ValidationToken.__table__
