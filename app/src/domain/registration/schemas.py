@@ -52,7 +52,7 @@ class AvailableEventResponse(BaseModel):
     available_slots: int = Field(
         ...,
         alias="availableSlots",
-        description="Vagas restantes (maxCapacity - registeredCount)",
+        description="Vagas restantes (max_capacity - registered_count)",
     )
 
     model_config = ConfigDict(populate_by_name=True)
@@ -110,23 +110,22 @@ class CheckInStatusResponse(BaseModel):
 
     event_id: UUID = Field(..., alias="eventId", description="ID do evento")
     user_id: UUID = Field(..., alias="userId", description="ID do usuário consultado")
-    is_registered: bool = Field(
+    status: RegistrationStatus = Field(
         ...,
-        alias="isRegistered",
-        description="Indica se o usuário possui inscrição ativa no evento",
+        description="Status atual da inscrição no banco de dados",
     )
-    is_confirmed: bool = Field(
+    created_at: datetime = Field(
         ...,
-        alias="isConfirmed",
-        description="Indica se a inscrição foi confirmada pelo usuário (e-mail/token)",
-    )
-    created_at: datetime | None = Field(
-        None,
         alias="createdAt",
-        description="Data/hora da criação da inscrição, se existir",
+        description="Data/hora da criação da inscrição",
+    )
+    updated_at: datetime | None = Field(
+        None,
+        alias="updatedAt",
+        description="Data/hora da última atualização da inscrição, se houver",
     )
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------------------------

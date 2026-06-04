@@ -31,6 +31,13 @@ class RegistrationService:
 
     def list_event_registrations(self, event_id: UUID) -> list[Registration]:
         return self.repository.list_by_event(event_id)
+    
+    def get_check_in_registration(
+        self,
+        event_id: UUID,
+        user_id: UUID,
+    ) -> Registration | None:
+        return self.repository.get_by_event_and_user(event_id, user_id)
 
 
 def get_registration_service(
