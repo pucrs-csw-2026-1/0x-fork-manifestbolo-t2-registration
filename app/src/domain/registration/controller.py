@@ -32,11 +32,11 @@ def register(
 ) -> RegistrationResponse:
     registration = service.register(body.event_id, body.user_id)
     return RegistrationResponse(
-        eventId=registration.event_id,
-        userId=registration.user_id,
+        event_id=registration.event_id,
+        user_id=registration.user_id,
         status=registration.status,
-        createdAt=registration.created_at,
-        updatedAt=registration.updated_at,
+        created_at=registration.created_at,
+        updated_at=registration.updated_at,
     )
 
 
@@ -87,11 +87,11 @@ def list_event_registrations(
     registrations = service.list_event_registrations(event_id)
     return [
         GuestRegistrationResponse(
-            eventId=r.event_id,
-            userId=r.user_id,
+            event_id=r.event_id,
+            user_id=r.user_id,
             status=r.status,
-            createdAt=r.created_at,
-            updatedAt=r.updated_at,
+            created_at=r.created_at,
+            updated_at=r.updated_at,
         )
         for r in registrations
     ]
