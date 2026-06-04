@@ -52,7 +52,7 @@ class AvailableEventResponse(BaseModel):
     available_slots: int = Field(
         ...,
         alias="availableSlots",
-        description="Vagas restantes (maxCapacity - registeredCount)",
+        description="Vagas restantes (max_capacity - registered_count)",
     )
 
     model_config = ConfigDict(populate_by_name=True)

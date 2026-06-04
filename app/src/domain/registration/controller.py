@@ -32,11 +32,11 @@ def register(
 ) -> RegistrationResponse:
     registration = service.register(body.event_id, body.user_id)
     return RegistrationResponse(
-        eventId=registration.event_id,
-        userId=registration.user_id,
+        event_id=registration.event_id,
+        user_id=registration.user_id,
         status=registration.status,
-        createdAt=registration.created_at,
-        updatedAt=registration.updated_at,
+        created_at=registration.created_at,
+        updated_at=registration.updated_at,
     )
 
 
@@ -155,7 +155,7 @@ def cancel_guest_registration(
         "Endpoint destinado ao microsserviço de check-in. "
         "Verifica se o usuário informado possui uma inscrição ativa no evento especificado "
         "e se essa inscrição foi confirmada. "
-        "Retorna sempre 200 com o campo `isRegistered` indicando o resultado — "
+        "Retorna sempre 200 com o campo `status` indicando o resultado — "
         "o serviço chamador é responsável por decidir se permite ou nega o acesso físico ao evento."
     ),
     tags=["registration", "check-in"],
@@ -174,11 +174,11 @@ def validate_check_in(
         )
 
     return CheckInStatusResponse(
-        eventId=event_id,
-        userId=user_id,
+        event_id=event_id,
+        user_id=user_id,
         status=registration.status,
-        createdAt=registration.created_at,
-        updatedAt=registration.updated_at,
+        created_at=registration.created_at,
+        updated_at=registration.updated_at,
     )
 
 
