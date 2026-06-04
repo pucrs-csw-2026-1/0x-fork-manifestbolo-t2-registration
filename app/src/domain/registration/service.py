@@ -29,6 +29,9 @@ class RegistrationService:
                 detail="User already registered for this event",
             ) from exc
 
+    def list_event_registrations(self, event_id: UUID) -> list[Registration]:
+        return self.repository.list_by_event(event_id)
+
     def get_check_in_registration(
         self,
         event_id: UUID,

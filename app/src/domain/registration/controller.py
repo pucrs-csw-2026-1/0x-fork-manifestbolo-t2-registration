@@ -80,12 +80,21 @@ def list_available_events() -> list[AvailableEventResponse]:
     summary="Lista usuários registrados em um evento",
     description="Consulta no banco de dados deste serviço todos os convidados inscritos no evento informado.",
 )
-def list_event_registrations(event_id: UUID) -> list[GuestRegistrationResponse]:
-    # TODO: buscar inscrições pelo event_id no repositório local
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
-    )
+def list_event_registrations(
+    event_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
+) -> list[GuestRegistrationResponse]:
+    registrations = service.list_event_registrations(event_id)
+    return [
+        GuestRegistrationResponse(
+            event_id=r.event_id,
+            user_id=r.user_id,
+            status=r.status,
+            created_at=r.created_at,
+            updated_at=r.updated_at,
+        )
+        for r in registrations
+    ]
 
 
 # ---------------------------------------------------------------------------

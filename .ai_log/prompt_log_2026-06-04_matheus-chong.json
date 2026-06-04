@@ -93,5 +93,21 @@
     },
     "role": "assistant",
     "content": "Feito.\n\nAjustei:\n\n- [controller.py](/home/chong/pucrs/construcao_software/manifestboloT2/manifestbolo-t2-registration/app/src/domain/registration/controller.py): troquei as instanciações Pydantic de `eventId`, `userId`, `createdAt`, `updatedAt` para `event_id`, `user_id`, `created_at`, `updated_at`.\n- [schemas.py](/home/chong/pucrs/construcao_software/manifestboloT2/manifestbolo-t2-registration/app/src/domain/registration/schemas.py): mantive os aliases JSON camelCase, mas corrigi a descrição para usar `max_capacity - registered_count`.\n\nValidação:\n\n- `ruff check src/domain/registration/controller.py src/domain/registration/schemas.py`: passou.\n- A busca por usos camelCase como argumento/atributo interno nesses arquivos não encontrou mais ocorrências.\n- Os testes de `registration` não rodaram completamente porque dependem de Docker via `testcontainers`; a execução com permissão elevada foi interrompida."
+  },
+  {
+    "timestamp": "2026-06-04T13:53:13.560Z",
+    "source": "codex",
+    "git_branch": "mf-47-get-users-in-event",
+    "git_user_name": "Matheus Chong",
+    "call_context": {
+      "turn_id": "019e92e8-d6ea-7bc3-8354-b3edb9c22f5f",
+      "transcript_path": "/home/chong/.codex/sessions/2026/06/04/rollout-2026-06-04T10-52-22-019e92e8-0fb2-7cb0-a816-d32004c4e495.jsonl",
+      "cwd": "/home/chong/pucrs/construcao_software/manifestboloT2/manifestbolo-t2-registration",
+      "hook_event_name": "UserPromptSubmit",
+      "model": "gpt-5.5",
+      "permission_mode": "default"
+    },
+    "role": "user",
+    "content": "app/src/domain/registration/controller.py use snake_case"
   }
 ]
