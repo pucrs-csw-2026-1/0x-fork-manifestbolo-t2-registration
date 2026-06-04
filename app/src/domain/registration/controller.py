@@ -155,7 +155,7 @@ def cancel_guest_registration(
         "Endpoint destinado ao microsserviço de check-in. "
         "Verifica se o usuário informado possui uma inscrição ativa no evento especificado "
         "e se essa inscrição foi confirmada. "
-        "Retorna sempre 200 com o campo `isRegistered` indicando o resultado — "
+        "Retorna sempre 200 com o campo `status` indicando o resultado — "
         "o serviço chamador é responsável por decidir se permite ou nega o acesso físico ao evento."
     ),
     tags=["registration", "check-in"],
@@ -163,11 +163,22 @@ def cancel_guest_registration(
 def validate_check_in(
     event_id: UUID,
     user_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
 ) -> CheckInStatusResponse:
-    # TODO: consultar a inscrição no repositório local pelo par (event_id, user_id)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
+    registration = service.get_check_in_registration(event_id, user_id)
+
+    if registration is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Registration not found.",
+        )
+
+    return CheckInStatusResponse(
+        event_id=event_id,
+        user_id=user_id,
+        status=registration.status,
+        created_at=registration.created_at,
+        updated_at=registration.updated_at,
     )
 
 
