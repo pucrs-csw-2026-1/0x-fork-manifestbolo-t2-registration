@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "PROMPT_LOG_SOURCE=copilot bash ./log_prompts.sh",
+        "cwd": ".ai_log",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
