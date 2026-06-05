@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from src.database import get_db
 
-from .model import Registration
+from .enums import RegistrationStatus
+from .model import Registration, ValidationToken
 
 
 class RegistrationRepository:
@@ -38,6 +39,21 @@ class RegistrationRepository:
     def create(self, event_id: UUID, user_id: UUID) -> Registration:
         registration = Registration(event_id=event_id, user_id=user_id)
         self.db.add(registration)
+        self.db.commit()
+        self.db.refresh(registration)
+        return registration
+
+    def get_validation_token(self, confirmation_id: UUID) -> ValidationToken | None:
+        return (
+            self.db.query(ValidationToken)
+            .filter(ValidationToken.id == confirmation_id)
+            .first()
+        )
+
+    def update_status(
+        self, registration: Registration, new_status: RegistrationStatus
+    ) -> Registration:
+        registration.status = new_status
         self.db.commit()
         self.db.refresh(registration)
         return registration
