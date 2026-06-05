@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.database import get_db
 
-from .model import Registration
+from .model import ActivityRegistration, Registration
 
 
 class RegistrationRepository:
@@ -23,6 +23,18 @@ class RegistrationRepository:
             .filter(
                 Registration.event_id == event_id,
                 Registration.user_id == user_id,
+            )
+            .first()
+        )
+
+    def get_by_activity_and_user(
+        self, activity_id: UUID, user_id: UUID
+    ) -> ActivityRegistration | None:
+        return (
+            self.db.query(ActivityRegistration)
+            .filter(
+                ActivityRegistration.activity_id == activity_id,
+                ActivityRegistration.user_id == user_id,
             )
             .first()
         )

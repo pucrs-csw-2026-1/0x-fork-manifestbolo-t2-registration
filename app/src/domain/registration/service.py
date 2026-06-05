@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from .model import Registration
+from .model import ActivityRegistration, Registration
 from .repository import RegistrationRepository, get_registration_repository
 
 
@@ -38,6 +38,13 @@ class RegistrationService:
         user_id: UUID,
     ) -> Registration | None:
         return self.repository.get_by_event_and_user(event_id, user_id)
+
+    def get_activity_registration(
+        self,
+        activity_id: UUID,
+        user_id: UUID,
+    ) -> ActivityRegistration | None:
+        return self.repository.get_by_activity_and_user(activity_id, user_id)
 
 
 def get_registration_service(
