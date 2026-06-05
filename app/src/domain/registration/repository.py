@@ -39,6 +39,19 @@ class RegistrationRepository:
             .first()
         )
 
+    def create_activity_registration(
+        self, activity_id: UUID, user_id: UUID, event_id: UUID
+    ) -> ActivityRegistration:
+        registration = ActivityRegistration(
+            activity_id=activity_id,
+            user_id=user_id,
+            event_id=event_id,
+        )
+        self.db.add(registration)
+        self.db.commit()
+        self.db.refresh(registration)
+        return registration
+
     def list_by_event(self, event_id: UUID) -> list[Registration]:
         return (
             self.db.query(Registration)

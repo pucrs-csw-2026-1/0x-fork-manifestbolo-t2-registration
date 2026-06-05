@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from .schemas import (
     ActivityRegistrationResponse,
+    ActivityRegistrationRequest,
     AvailableEventResponse,
     CheckInStatusResponse,
     ConfirmationCodeRequest,
@@ -123,6 +124,36 @@ def get_activity_registration(
             detail="Registration not found.",
         )
 
+    return ActivityRegistrationResponse(
+        activityId=registration.activity_id,
+        userId=registration.user_id,
+        eventId=registration.event_id,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /activities/registrations – inscrição em atividade
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/activities/registrations",
+    response_model=ActivityRegistrationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Cria uma inscrição em atividade",
+    description="Cria uma inscrição de usuário em uma atividade com base no payload informado.",
+)
+def register_activity(
+    body: ActivityRegistrationRequest,
+    service: RegistrationService = Depends(get_registration_service),
+) -> ActivityRegistrationResponse:
+    registration = service.register_activity(
+        body.activity_id,
+        body.user_id,
+        body.event_id,
+    )
     return ActivityRegistrationResponse(
         activityId=registration.activity_id,
         userId=registration.user_id,

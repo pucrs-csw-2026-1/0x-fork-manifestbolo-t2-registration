@@ -108,6 +108,16 @@ class ActivityRegistrationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
+class ActivityRegistrationRequest(BaseModel):
+    """Payload para criar uma inscrição em atividade."""
+
+    activity_id: UUID = Field(..., alias="activityId", description="ID da atividade")
+    user_id: UUID = Field(..., alias="userId", description="ID do usuário inscrito")
+    event_id: UUID = Field(..., alias="eventId", description="ID do evento associado")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 # ---------------------------------------------------------------------------
 # POST /events/{event_id}/guests  –  inscrição de convidado
 # ---------------------------------------------------------------------------
