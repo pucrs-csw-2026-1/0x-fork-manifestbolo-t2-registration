@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from src.database import Base
 from src.domain.registration.enums import RegistrationStatus
-from src.domain.registration.model import ActivityRegistration, Registration, ValidationToken
+from src.domain.registration.model import (
+    ActivityRegistration,
+    Registration,
+    ValidationToken,
+)
 from src.domain.registration.repository import RegistrationRepository
 from src.domain.registration.service import RegistrationService
 
