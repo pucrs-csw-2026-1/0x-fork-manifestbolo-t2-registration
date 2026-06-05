@@ -11,6 +11,8 @@ Microsserviço responsável por gerenciar inscrições de usuários em eventos d
 | `GET` | `/health` | Health check da aplicação |
 | `GET` | `/events/available` | Lista eventos com vagas disponíveis |
 | `GET` | `/events/{event_id}/registrations` | Lista inscritos de um evento |
+| `POST` | `/activities/registrations` | Cria uma inscrição em atividade |
+| `GET` | `/activities/{activity_id}/users/{user_id}` | Busca uma inscrição de atividade por atividade e usuário |
 | `POST` | `/events/{event_id}/guests` | Inscreve um convidado em um evento |
 | `GET` | `/events/{event_id}/guests/{user_id}/check-in` | Valida inscrição para check-in (uso interno) |
 | `POST` | `/events/confirmation/{confirmation_id}` | Confirma inscrição via código alfanumérico |

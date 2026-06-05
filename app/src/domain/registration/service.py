@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from .model import Registration
+from .model import ActivityRegistration, Registration
 from .repository import RegistrationRepository, get_registration_repository
 
 
@@ -38,6 +38,38 @@ class RegistrationService:
         user_id: UUID,
     ) -> Registration | None:
         return self.repository.get_by_event_and_user(event_id, user_id)
+
+    def get_activity_registration(
+        self,
+        activity_id: UUID,
+        user_id: UUID,
+    ) -> ActivityRegistration | None:
+        return self.repository.get_by_activity_and_user(activity_id, user_id)
+
+    def register_activity(
+        self,
+        activity_id: UUID,
+        user_id: UUID,
+        event_id: UUID,
+    ) -> ActivityRegistration:
+        if self.repository.get_by_activity_and_user(activity_id, user_id) is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User already registered for this activity",
+            )
+
+        try:
+            return self.repository.create_activity_registration(
+                activity_id,
+                user_id,
+                event_id,
+            )
+        except IntegrityError as exc:
+            self.repository.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User already registered for this activity",
+            ) from exc
 
 
 def get_registration_service(
