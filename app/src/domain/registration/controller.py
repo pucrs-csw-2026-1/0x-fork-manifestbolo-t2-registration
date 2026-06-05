@@ -142,12 +142,9 @@ def register_guest(
 def cancel_guest_registration(
     event_id: UUID,
     user_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
 ) -> None:
-    # TODO: verificar se o evento ainda não ocorreu, localizar a inscrição e removê-la
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
-    )
+    service.cancel_registration(event_id, user_id)
 
 
 # ---------------------------------------------------------------------------

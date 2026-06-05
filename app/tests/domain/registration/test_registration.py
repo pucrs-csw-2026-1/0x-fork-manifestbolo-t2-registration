@@ -120,6 +120,31 @@ def test_validate_check_in_returns_false_for_missing_registration(
     assert response.status_code == 404
 
 
+def test_cancel_registration_soft_deletes_existing(
+    client: TestClient, db_session: Session
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    db_session.add(Registration(event_id=event_id, user_id=user_id))
+    db_session.commit()
+
+    response = client.delete(f"/events/{event_id}/guests/{user_id}")
+
+    assert response.status_code == 204
+
+    registration = RegistrationRepository(db_session).get_by_event_and_user(
+        event_id, user_id
+    )
+    assert registration is not None
+    assert registration.status == RegistrationStatus.CANCELLED
+
+
+def test_cancel_registration_returns_404_when_missing(client: TestClient) -> None:
+    response = client.delete(f"/events/{uuid4()}/guests/{uuid4()}")
+
+    assert response.status_code == 404
+
+
 def test_validation_token_belongs_to_registration_domain_metadata() -> None:
     assert ValidationToken.__table__.name == "authentication_tokens"
     assert Base.metadata.tables["authentication_tokens"] is ValidationToken.__table__
