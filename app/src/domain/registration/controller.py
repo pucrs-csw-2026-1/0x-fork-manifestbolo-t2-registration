@@ -98,6 +98,28 @@ def list_event_registrations(
 
 
 # ---------------------------------------------------------------------------
+# GET /activities/{activity_id}/registrations – user ids inscritos numa atividade
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/activities/{activity_id}/registrations",
+    response_model=list[UUID],
+    status_code=status.HTTP_200_OK,
+    summary="Lista os ids de usuários inscritos em uma atividade",
+    description=(
+        "Retorna um array com os `userId` de todos os usuários inscritos na atividade "
+        "informada. Quando a atividade não possui inscritos, retorna 200 com um array vazio."
+    ),
+)
+def list_activity_registrations(
+    activity_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
+) -> list[UUID]:
+    return service.list_activity_user_ids(activity_id)
+
+
+# ---------------------------------------------------------------------------
 # POST /events/{event_id}/guests – inscrição de convidado
 # ---------------------------------------------------------------------------
 

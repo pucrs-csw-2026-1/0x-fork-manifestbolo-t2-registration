@@ -32,6 +32,9 @@ class RegistrationService:
     def list_event_registrations(self, event_id: UUID) -> list[Registration]:
         return self.repository.list_by_event(event_id)
 
+    def list_activity_user_ids(self, activity_id: UUID) -> list[UUID]:
+        return self.repository.list_user_ids_by_activity(activity_id)
+
     def get_check_in_registration(
         self,
         event_id: UUID,
