@@ -198,6 +198,64 @@ def test_get_activity_registration_endpoint_returns_row(
     assert payload["updatedAt"] is not None
 
 
+def test_activity_registration_repository_creates_row(db_session: Session) -> None:
+    repository = RegistrationRepository(db_session)
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    registration = repository.create_activity_registration(
+        activity_id,
+        user_id,
+        event_id,
+    )
+
+    assert registration.activity_id == activity_id
+    assert registration.user_id == user_id
+    assert registration.event_id == event_id
+    assert registration.created_at is not None
+    assert registration.updated_at is not None
+
+
+def test_activity_registration_service_creates_row(db_session: Session) -> None:
+    repository = RegistrationRepository(db_session)
+    service = RegistrationService(repository)
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    registration = service.register_activity(activity_id, user_id, event_id)
+
+    assert registration.activity_id == activity_id
+    assert registration.user_id == user_id
+    assert registration.event_id == event_id
+
+
+def test_post_activity_registration_endpoint_creates_row(
+    client: TestClient, db_session: Session
+) -> None:
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    response = client.post(
+        "/activities/registrations",
+        json={
+            "activityId": str(activity_id),
+            "userId": str(user_id),
+            "eventId": str(event_id),
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["activityId"] == str(activity_id)
+    assert payload["userId"] == str(user_id)
+    assert payload["eventId"] == str(event_id)
+    assert payload["createdAt"] is not None
+    assert payload["updatedAt"] is not None
+
+
 def test_validation_token_belongs_to_registration_domain_metadata() -> None:
     assert ValidationToken.__table__.name == "authentication_tokens"
     assert Base.metadata.tables["authentication_tokens"] is ValidationToken.__table__
