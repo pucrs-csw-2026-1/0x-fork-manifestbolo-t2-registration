@@ -4,6 +4,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from src.domain.auth.dependencies import get_current_user
+from src.domain.auth.schemas import UserResponse
+
 from .schemas import (
     AvailableEventResponse,
     CheckInStatusResponse,
@@ -29,8 +32,9 @@ router = APIRouter(tags=["registration"])
 def register(
     body: RegistrationCreateRequest,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> RegistrationResponse:
-    registration = service.register(body.event_id, body.user_id)
+    registration = service.register(body.event_id, body.user_id, auth_user.id)
     return RegistrationResponse(
         event_id=registration.event_id,
         user_id=registration.user_id,
@@ -115,11 +119,16 @@ def list_event_registrations(
 def register_guest(
     event_id: UUID,
     body: GuestRegistrationRequest,
+    service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> GuestRegistrationResponse:
-    # TODO: validar vagas, consultar evento no microserviço externo e salvar inscrição
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
+    registration = service.register(event_id, body.user_id, auth_user.id)
+    return GuestRegistrationResponse(
+        event_id=registration.event_id,
+        user_id=registration.user_id,
+        status=registration.status,
+        created_at=registration.created_at,
+        updated_at=registration.updated_at,
     )
 
 
@@ -142,7 +151,15 @@ def register_guest(
 def cancel_guest_registration(
     event_id: UUID,
     user_id: UUID,
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> None:
+    _ = event_id
+    if auth_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated user does not match requested user",
+        )
+
     # TODO: verificar se o evento ainda não ocorreu, localizar a inscrição e removê-la
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -223,7 +240,9 @@ def validate_check_in(
 def confirm_registration(
     confirmation_id: UUID,
     body: ConfirmationCodeRequest,
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> ConfirmationResponse:
+    _ = (confirmation_id, body, auth_user)
     # TODO: buscar o token de validação pelo confirmation_id na tabela authentication_tokens
     #   → 404 se não existir
     # TODO: verificar se expires_at < now()
