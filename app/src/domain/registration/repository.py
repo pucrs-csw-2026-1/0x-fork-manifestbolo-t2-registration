@@ -1,6 +1,7 @@
 """Repository for registration persistence."""
 
 from collections.abc import Generator
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import Depends
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from src.database import get_db
 
 from .enums import RegistrationStatus
-from .model import ActivityRegistration, Registration
+from .model import ActivityRegistration, Registration, ValidationToken
 
 
 class RegistrationRepository:
@@ -76,6 +77,44 @@ class RegistrationRepository:
         self.db.commit()
         self.db.refresh(registration)
         return registration
+
+    def create_with_authentication_token(
+        self,
+        event_id: UUID,
+        user_id: UUID,
+        token: str,
+        expires_at: datetime,
+    ) -> Registration:
+        registration = Registration(event_id=event_id, user_id=user_id)
+        authentication_token = ValidationToken(
+            event_id=event_id,
+            user_id=user_id,
+            token=token,
+            expires_at=expires_at,
+        )
+        self.db.add(registration)
+        self.db.add(authentication_token)
+        self.db.commit()
+        self.db.refresh(registration)
+        return registration
+
+    def create_authentication_token(
+        self,
+        event_id: UUID,
+        user_id: UUID,
+        token: str,
+        expires_at: datetime,
+    ) -> ValidationToken:
+        authentication_token = ValidationToken(
+            event_id=event_id,
+            user_id=user_id,
+            token=token,
+            expires_at=expires_at,
+        )
+        self.db.add(authentication_token)
+        self.db.commit()
+        self.db.refresh(authentication_token)
+        return authentication_token
 
     def update_status(
         self, registration: Registration, new_status: RegistrationStatus
