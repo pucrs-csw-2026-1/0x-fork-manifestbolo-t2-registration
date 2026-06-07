@@ -84,6 +84,41 @@ class GuestRegistrationResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# GET /activities/{activity_id}/users/{user_id}  –  inscrição em atividade
+# ---------------------------------------------------------------------------
+
+
+class ActivityRegistrationResponse(BaseModel):
+    """Representa a inscrição de um usuário em uma atividade."""
+
+    activity_id: UUID = Field(..., alias="activityId", description="ID da atividade")
+    user_id: UUID = Field(..., alias="userId", description="ID do usuário inscrito")
+    event_id: UUID = Field(..., alias="eventId", description="ID do evento associado")
+    created_at: datetime = Field(
+        ...,
+        alias="createdAt",
+        description="Data/hora de criação da inscrição",
+    )
+    updated_at: datetime = Field(
+        ...,
+        alias="updatedAt",
+        description="Data/hora da última atualização da inscrição",
+    )
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class ActivityRegistrationRequest(BaseModel):
+    """Payload para criar uma inscrição em atividade."""
+
+    activity_id: UUID = Field(..., alias="activityId", description="ID da atividade")
+    user_id: UUID = Field(..., alias="userId", description="ID do usuário inscrito")
+    event_id: UUID = Field(..., alias="eventId", description="ID do evento associado")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+# ---------------------------------------------------------------------------
 # POST /events/{event_id}/guests  –  inscrição de convidado
 # ---------------------------------------------------------------------------
 
