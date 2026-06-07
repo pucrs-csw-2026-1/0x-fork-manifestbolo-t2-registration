@@ -155,6 +155,8 @@ def test_list_activity_registrations_returns_empty_list_when_none(
 
     assert response.status_code == 200
     assert response.json() == []
+
+
 def test_activity_registration_repository_finds_row(db_session: Session) -> None:
     repository = RegistrationRepository(db_session)
     activity_id = uuid4()

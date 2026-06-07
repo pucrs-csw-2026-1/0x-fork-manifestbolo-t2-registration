@@ -5,8 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .schemas import (
-    ActivityRegistrationResponse,
     ActivityRegistrationRequest,
+    ActivityRegistrationResponse,
     AvailableEventResponse,
     CheckInStatusResponse,
     ConfirmationCodeRequest,
@@ -103,6 +103,7 @@ def list_event_registrations(
 # GET /activities/{activity_id}/registrations – user ids inscritos numa atividade
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/activities/{activity_id}/registrations",
     response_model=list[UUID],
@@ -119,9 +120,11 @@ def list_activity_registrations(
 ) -> list[UUID]:
     return service.list_activity_user_ids(activity_id)
 
+
 # ---------------------------------------------------------------------------
 # GET /activities/{activity_id}/users/{user_id} – inscrição em atividade
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/activities/{activity_id}/users/{user_id}",
