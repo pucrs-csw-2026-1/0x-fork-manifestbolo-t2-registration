@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from src.database import Base
 from src.domain.registration.enums import RegistrationStatus
-from src.domain.registration.model import Registration, ValidationToken
+from src.domain.registration.model import (
+    ActivityRegistration,
+    Registration,
+    ValidationToken,
+)
 from src.domain.registration.repository import RegistrationRepository
 from src.domain.registration.service import RegistrationService
 
@@ -143,6 +147,171 @@ def test_cancel_registration_returns_404_when_missing(client: TestClient) -> Non
     response = client.delete(f"/events/{uuid4()}/guests/{uuid4()}")
 
     assert response.status_code == 404
+
+
+def test_list_activity_registrations_returns_user_ids(
+    client: TestClient, db_session: Session
+) -> None:
+    activity_id = uuid4()
+    event_id = uuid4()
+    user_ids = [uuid4(), uuid4()]
+    for user_id in user_ids:
+        db_session.add(
+            ActivityRegistration(
+                activity_id=activity_id,
+                user_id=user_id,
+                event_id=event_id,
+            )
+        )
+    db_session.commit()
+
+    response = client.get(f"/activities/{activity_id}/registrations")
+
+    assert response.status_code == 200
+    assert sorted(response.json()) == sorted(str(uid) for uid in user_ids)
+
+
+def test_list_activity_registrations_returns_empty_list_when_none(
+    client: TestClient,
+) -> None:
+    activity_id = uuid4()
+
+    response = client.get(f"/activities/{activity_id}/registrations")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_activity_registration_repository_finds_row(db_session: Session) -> None:
+    repository = RegistrationRepository(db_session)
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    db_session.add(
+        ActivityRegistration(
+            activity_id=activity_id,
+            user_id=user_id,
+            event_id=event_id,
+        )
+    )
+    db_session.commit()
+
+    registration = repository.get_by_activity_and_user(activity_id, user_id)
+
+    assert registration is not None
+    assert registration.activity_id == activity_id
+    assert registration.user_id == user_id
+    assert registration.event_id == event_id
+
+
+def test_activity_registration_service_returns_row(db_session: Session) -> None:
+    repository = RegistrationRepository(db_session)
+    service = RegistrationService(repository)
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    db_session.add(
+        ActivityRegistration(
+            activity_id=activity_id,
+            user_id=user_id,
+            event_id=event_id,
+        )
+    )
+    db_session.commit()
+
+    registration = service.get_activity_registration(activity_id, user_id)
+
+    assert registration is not None
+    assert registration.activity_id == activity_id
+    assert registration.user_id == user_id
+    assert registration.event_id == event_id
+
+
+def test_get_activity_registration_endpoint_returns_row(
+    client: TestClient, db_session: Session
+) -> None:
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    db_session.add(
+        ActivityRegistration(
+            activity_id=activity_id,
+            user_id=user_id,
+            event_id=event_id,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/activities/{activity_id}/users/{user_id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["activityId"] == str(activity_id)
+    assert payload["userId"] == str(user_id)
+    assert payload["eventId"] == str(event_id)
+    assert payload["createdAt"] is not None
+    assert payload["updatedAt"] is not None
+
+
+def test_activity_registration_repository_creates_row(db_session: Session) -> None:
+    repository = RegistrationRepository(db_session)
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    registration = repository.create_activity_registration(
+        activity_id,
+        user_id,
+        event_id,
+    )
+
+    assert registration.activity_id == activity_id
+    assert registration.user_id == user_id
+    assert registration.event_id == event_id
+    assert registration.created_at is not None
+    assert registration.updated_at is not None
+
+
+def test_activity_registration_service_creates_row(db_session: Session) -> None:
+    repository = RegistrationRepository(db_session)
+    service = RegistrationService(repository)
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    registration = service.register_activity(activity_id, user_id, event_id)
+
+    assert registration.activity_id == activity_id
+    assert registration.user_id == user_id
+    assert registration.event_id == event_id
+
+
+def test_post_activity_registration_endpoint_creates_row(
+    client: TestClient, db_session: Session
+) -> None:
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+
+    response = client.post(
+        "/activities/registrations",
+        json={
+            "activityId": str(activity_id),
+            "userId": str(user_id),
+            "eventId": str(event_id),
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["activityId"] == str(activity_id)
+    assert payload["userId"] == str(user_id)
+    assert payload["eventId"] == str(event_id)
+    assert payload["createdAt"] is not None
+    assert payload["updatedAt"] is not None
 
 
 def test_validation_token_belongs_to_registration_domain_metadata() -> None:
