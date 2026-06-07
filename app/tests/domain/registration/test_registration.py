@@ -124,6 +124,39 @@ def test_validate_check_in_returns_false_for_missing_registration(
     assert response.status_code == 404
 
 
+def test_list_activity_registrations_returns_user_ids(
+    client: TestClient, db_session: Session
+) -> None:
+    activity_id = uuid4()
+    event_id = uuid4()
+    user_ids = [uuid4(), uuid4()]
+    for user_id in user_ids:
+        db_session.add(
+            ActivityRegistration(
+                activity_id=activity_id,
+                user_id=user_id,
+                event_id=event_id,
+            )
+        )
+    db_session.commit()
+
+    response = client.get(f"/activities/{activity_id}/registrations")
+
+    assert response.status_code == 200
+    assert sorted(response.json()) == sorted(str(uid) for uid in user_ids)
+
+
+def test_list_activity_registrations_returns_empty_list_when_none(
+    client: TestClient,
+) -> None:
+    activity_id = uuid4()
+
+    response = client.get(f"/activities/{activity_id}/registrations")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_activity_registration_repository_finds_row(db_session: Session) -> None:
     repository = RegistrationRepository(db_session)
     activity_id = uuid4()

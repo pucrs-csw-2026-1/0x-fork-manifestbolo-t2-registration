@@ -60,6 +60,15 @@ class RegistrationRepository:
             .all()
         )
 
+    def list_user_ids_by_activity(self, activity_id: UUID) -> list[UUID]:
+        rows = (
+            self.db.query(ActivityRegistration.user_id)
+            .filter(ActivityRegistration.activity_id == activity_id)
+            .order_by(ActivityRegistration.created_at)
+            .all()
+        )
+        return [row.user_id for row in rows]
+
     def create(self, event_id: UUID, user_id: UUID) -> Registration:
         registration = Registration(event_id=event_id, user_id=user_id)
         self.db.add(registration)
