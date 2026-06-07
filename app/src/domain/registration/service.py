@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
+from .enums import RegistrationStatus
 from .model import ActivityRegistration, Registration
 from .repository import RegistrationRepository, get_registration_repository
 
@@ -41,6 +42,23 @@ class RegistrationService:
         user_id: UUID,
     ) -> Registration | None:
         return self.repository.get_by_event_and_user(event_id, user_id)
+
+    def cancel_registration(self, event_id: UUID, user_id: UUID) -> None:
+        registration = self.repository.get_by_event_and_user(event_id, user_id)
+        if registration is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Registration not found.",
+            )
+
+        # TODO: rejeitar cancelamento com 422 quando o evento já tiver ocorrido.
+        # Depende do contrato real do events-service (EventsClient hoje é apenas
+        # um placeholder), então a checagem fica pendente até a integração existir.
+
+        # Soft delete: mantém o histórico marcando a inscrição como CANCELLED.
+        # Idempotente: cancelar uma inscrição já cancelada também retorna 204.
+        if registration.status != RegistrationStatus.CANCELLED:
+            self.repository.update_status(registration, RegistrationStatus.CANCELLED)
 
     def get_activity_registration(
         self,
