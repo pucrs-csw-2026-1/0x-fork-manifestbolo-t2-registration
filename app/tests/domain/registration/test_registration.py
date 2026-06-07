@@ -91,10 +91,14 @@ def test_register_endpoint_creates_authentication_token(
 
     assert response.status_code == 201
 
-    auth_token = db_session.query(ValidationToken).filter_by(
-        event_id=event_id,
-        user_id=user_id,
-    ).one()
+    auth_token = (
+        db_session.query(ValidationToken)
+        .filter_by(
+            event_id=event_id,
+            user_id=user_id,
+        )
+        .one()
+    )
 
     assert auth_token.token is not None
     assert len(auth_token.token) == 8
