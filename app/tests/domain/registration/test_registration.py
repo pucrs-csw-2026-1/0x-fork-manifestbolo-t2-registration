@@ -76,6 +76,37 @@ def test_register_endpoint_creates_registration(client: TestClient) -> None:
     assert payload["updatedAt"] is None
 
 
+def test_register_endpoint_creates_authentication_token(
+    client: TestClient, db_session: Session
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    override_auth_user(user_id)
+
+    response = client.post(
+        f"/events/{event_id}/guests",
+        json={"userId": str(user_id)},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 201
+
+    auth_token = (
+        db_session.query(ValidationToken)
+        .filter_by(
+            event_id=event_id,
+            user_id=user_id,
+        )
+        .one()
+    )
+
+    assert auth_token.token is not None
+    assert len(auth_token.token) == 8
+    assert auth_token.token.isalnum()
+    assert auth_token.expires_at is not None
+    assert auth_token.expires_at > auth_token.created_at
+
+
 def test_registration_repository_persists_row(db_session: Session) -> None:
     repository = RegistrationRepository(db_session)
     event_id = uuid4()

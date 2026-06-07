@@ -1,9 +1,14 @@
 """Business logic for registrations."""
 
+from datetime import UTC, datetime, timedelta
+import secrets
+from string import ascii_letters, digits
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
+
+from src.config import get_settings
 
 from .enums import RegistrationStatus
 from .model import ActivityRegistration, Registration
@@ -13,6 +18,16 @@ from .repository import RegistrationRepository, get_registration_repository
 class RegistrationService:
     def __init__(self, repository: RegistrationRepository) -> None:
         self.repository = repository
+
+    def _generate_authentication_token(self) -> str:
+        alphabet = ascii_letters + digits
+        return "".join(secrets.choice(alphabet) for _ in range(8))
+
+    def _authentication_token_expires_at(self) -> datetime:
+        settings = get_settings()
+        return datetime.now(UTC) + timedelta(
+            minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        )
 
     def register(
         self,
@@ -33,7 +48,12 @@ class RegistrationService:
             )
 
         try:
-            return self.repository.create(event_id, user_id)
+            return self.repository.create_with_authentication_token(
+                event_id,
+                user_id,
+                self._generate_authentication_token(),
+                self._authentication_token_expires_at(),
+            )
         except IntegrityError as exc:
             self.repository.db.rollback()
             raise HTTPException(
