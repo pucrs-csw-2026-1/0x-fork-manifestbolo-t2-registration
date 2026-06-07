@@ -26,9 +26,16 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
 
+    # Mantidos por compatibilidade — NÃO são mais usados para validar tokens.
+    # A validação migrou para RS256/JWKS contra o Auth Service (ver
+    # src/domain/auth/security.py e o INTEGRATION.md do auth-service).
     JWT_SECRET_KEY: str = "change-me-in-production"
-    JWT_ALGORITHM: str = "HS256"
+    JWT_ALGORITHM: str = "RS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # Auth Service (microsserviço externo). Base usada para buscar o JWKS
+    # público e validar os tokens localmente. Em dev aponta para o Auth na
+    # máquina local; no docker-compose é sobrescrito para o nome do container.
     AUTH_SERVICE_BASE_URL: str = "http://localhost:8080"
 
     model_config = SettingsConfigDict(

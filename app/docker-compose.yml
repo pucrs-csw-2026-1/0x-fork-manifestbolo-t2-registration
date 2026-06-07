@@ -6,21 +6,27 @@ services:
     container_name: app
     env_file:
       - .env
+    environment:
+      # Dentro do container, o Auth Service é alcançado pela porta publicada no
+      # host (8080). host.docker.internal resolve para o host (host-gateway), de
+      # modo que NÃO dependemos da rede interna do compose do Auth (0X).
+      # Pré-requisito: o Auth precisa estar no ar publicando a porta 8080.
+      - AUTH_SERVICE_BASE_URL=http://host.docker.internal:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
-      ministack:
-        condition: service_started
 
   db:
     image: postgres:15-alpine
     container_name: app-db
     env_file:
       - .env
-    ports:
-      - "5432:5432"
+    # Sem mapeamento de porta no host: o app fala com o Postgres pela rede do
+    # Compose (db:5432). Evita conflito com um Postgres local na 5432.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -29,14 +35,5 @@ services:
       timeout: 5s
       retries: 10
 
-  ministack:
-    image: ministackorg/ministack:latest
-    container_name: app-ministack
-    ports:
-      - "4566:4566"
-    volumes:
-      - ministack_data:/tmp/ministack
-
 volumes:
   postgres_data:
-  ministack_data:

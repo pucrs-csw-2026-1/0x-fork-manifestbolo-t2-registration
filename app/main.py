@@ -4,6 +4,7 @@ import logging
 from fastapi import FastAPI
 
 from src.config import get_settings
+from src.domain.auth.controller import router as auth_router
 from src.domain.health.controller import router as health_router
 from src.domain.health.model import HealthLog
 from src.domain.registration.controller import router as registration_router
@@ -36,4 +37,5 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(registration_router)
