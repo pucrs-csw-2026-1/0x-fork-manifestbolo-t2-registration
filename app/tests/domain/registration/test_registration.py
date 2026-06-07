@@ -1,13 +1,17 @@
 """Tests for event registration."""
 
 from datetime import datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy.orm import Session
 
+from main import app
 from src.database import Base
+from src.domain.auth.client import get_auth_client
+from src.domain.auth.schemas import UserResponse
 from src.domain.registration.enums import RegistrationStatus
 from src.domain.registration.model import (
     ActivityRegistration,
@@ -18,17 +22,55 @@ from src.domain.registration.repository import RegistrationRepository
 from src.domain.registration.service import RegistrationService
 
 
-@pytest.mark.xfail(reason="POST /events/{event_id}/guests ainda não implementado (501)")
+class FakeAuthClient:
+    def __init__(
+        self,
+        user: UserResponse | None = None,
+        exception: HTTPException | None = None,
+    ) -> None:
+        self.user = user
+        self.exception = exception
+
+    def validate_token(self, token: str) -> UserResponse:
+        if self.exception is not None:
+            raise self.exception
+        if self.user is None:
+            raise AssertionError("fake auth user not configured")
+        return self.user
+
+
+def override_auth_user(user_id: UUID) -> None:
+    user = UserResponse(
+        id=user_id,
+        email="user@example.com",
+        username="user",
+        access_level="PARTICIPANT",
+        is_active=True,
+    )
+    app.dependency_overrides[get_auth_client] = lambda: FakeAuthClient(user=user)
+
+
+def override_auth_exception(exception: HTTPException) -> None:
+    app.dependency_overrides[get_auth_client] = lambda: FakeAuthClient(
+        exception=exception
+    )
+
+
 def test_register_endpoint_creates_registration(client: TestClient) -> None:
     event_id = uuid4()
-    user_id = str(uuid4())
+    user_id = uuid4()
+    override_auth_user(user_id)
 
-    response = client.post(f"/events/{event_id}/guests", json={"userId": user_id})
+    response = client.post(
+        f"/events/{event_id}/guests",
+        json={"userId": str(user_id)},
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["eventId"] == event_id
-    assert payload["userId"] == user_id
+    assert payload["eventId"] == str(event_id)
+    assert payload["userId"] == str(user_id)
     assert payload["status"] == RegistrationStatus.REGISTERED.value
     assert payload["createdAt"] is not None
     assert payload["updatedAt"] is None
@@ -54,14 +96,87 @@ def test_registration_service_rejects_duplicates(db_session: Session) -> None:
     event_id = uuid4()
     user_id = uuid4()
 
-    service.register(event_id, user_id)
+    service.register(event_id, user_id, user_id)
 
     try:
-        service.register(event_id, user_id)
+        service.register(event_id, user_id, user_id)
     except Exception as exc:  # noqa: BLE001
         assert getattr(exc, "status_code", None) == 409
     else:
         raise AssertionError("expected duplicate registration to fail")
+
+
+def test_registration_service_rejects_identity_mismatch(
+    db_session: Session,
+) -> None:
+    repository = RegistrationRepository(db_session)
+    service = RegistrationService(repository)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.register(uuid4(), uuid4(), uuid4())
+
+    assert exc_info.value.status_code == 403
+
+
+def test_post_register_requires_bearer_token(client: TestClient) -> None:
+    response = client.post(
+        "/register",
+        json={"eventId": str(uuid4()), "userId": str(uuid4())},
+    )
+
+    assert response.status_code == 401
+
+
+def test_post_register_accepts_matching_authenticated_user(
+    client: TestClient,
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    override_auth_user(user_id)
+
+    response = client.post(
+        "/register",
+        json={"eventId": str(event_id), "userId": str(user_id)},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["eventId"] == str(event_id)
+    assert payload["userId"] == str(user_id)
+
+
+def test_post_register_rejects_different_authenticated_user(
+    client: TestClient,
+) -> None:
+    override_auth_user(uuid4())
+
+    response = client.post(
+        "/register",
+        json={"eventId": str(uuid4()), "userId": str(uuid4())},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_post_register_returns_503_when_auth_fails(
+    client: TestClient,
+) -> None:
+    override_auth_exception(
+        HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Auth service unavailable",
+        )
+    )
+
+    response = client.post(
+        "/register",
+        json={"eventId": str(uuid4()), "userId": str(uuid4())},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 503
 
 
 def test_registration_model_defaults_timestamp(db_session: Session) -> None:

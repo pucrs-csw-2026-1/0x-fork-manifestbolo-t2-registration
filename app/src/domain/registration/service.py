@@ -14,7 +14,18 @@ class RegistrationService:
     def __init__(self, repository: RegistrationRepository) -> None:
         self.repository = repository
 
-    def register(self, event_id: UUID, user_id: UUID) -> Registration:
+    def register(
+        self,
+        event_id: UUID,
+        user_id: UUID,
+        authenticated_user_id: UUID,
+    ) -> Registration:
+        if authenticated_user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Authenticated user does not match requested user",
+            )
+
         if self.repository.get_by_event_and_user(event_id, user_id) is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

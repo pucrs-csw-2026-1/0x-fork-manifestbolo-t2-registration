@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    AUTH_SERVICE_BASE_URL: str = "http://localhost:8080"
 
     model_config = SettingsConfigDict(
         env_file=".env",
