@@ -39,12 +39,12 @@ class FakeAuthClient:
         return self.user
 
 
-def override_auth_user(user_id: UUID) -> None:
+def override_auth_user(user_id: UUID, access_level: str = "PARTICIPANT") -> None:
     user = UserResponse(
         id=user_id,
         email="user@example.com",
         username="user",
-        access_level="PARTICIPANT",
+        access_level=access_level,
         is_active=True,
     )
     app.dependency_overrides[get_auth_client] = lambda: FakeAuthClient(user=user)
@@ -191,6 +191,25 @@ def test_post_register_rejects_different_authenticated_user(
     assert response.status_code == 403
 
 
+def test_post_register_allows_admin_to_register_other_user(
+    client: TestClient,
+) -> None:
+    event_id = uuid4()
+    target_user_id = uuid4()
+    override_auth_user(uuid4(), "ADMIN")
+
+    response = client.post(
+        "/register",
+        json={"eventId": str(event_id), "userId": str(target_user_id)},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["eventId"] == str(event_id)
+    assert payload["userId"] == str(target_user_id)
+
+
 def test_post_register_returns_503_when_auth_fails(
     client: TestClient,
 ) -> None:
@@ -235,6 +254,40 @@ def test_registration_updated_at_is_populated_on_update(db_session: Session) -> 
     assert registration.updated_at is not None
 
 
+def test_list_event_registrations_requires_manager_or_admin(
+    client: TestClient,
+) -> None:
+    override_auth_user(uuid4())
+
+    response = client.get(
+        f"/events/{uuid4()}/registrations",
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_list_event_registrations_returns_rows_for_manager(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    event_id = uuid4()
+    user_ids = [uuid4(), uuid4()]
+    for user_id in user_ids:
+        db_session.add(Registration(event_id=event_id, user_id=user_id))
+    db_session.commit()
+    override_auth_user(uuid4(), "MANAGER")
+
+    response = client.get(
+        f"/events/{event_id}/registrations",
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["userId"] for row in payload] == [str(uid) for uid in user_ids]
+
+
 def test_validate_check_in_returns_registration_state(
     client: TestClient, db_session: Session
 ) -> None:
@@ -247,8 +300,12 @@ def test_validate_check_in_returns_registration_state(
     )
     db_session.add(registration)
     db_session.commit()
+    override_auth_user(uuid4(), "MANAGER")
 
-    response = client.get(f"/events/{event_id}/guests/{user_id}/check-in")
+    response = client.get(
+        f"/events/{event_id}/guests/{user_id}/check-in",
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -264,10 +321,25 @@ def test_validate_check_in_returns_false_for_missing_registration(
 ) -> None:
     event_id = uuid4()
     user_id = uuid4()
+    override_auth_user(uuid4(), "MANAGER")
 
-    response = client.get(f"/events/{event_id}/guests/{user_id}/check-in")
+    response = client.get(
+        f"/events/{event_id}/guests/{user_id}/check-in",
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 404
+
+
+def test_validate_check_in_rejects_participant_role(client: TestClient) -> None:
+    override_auth_user(uuid4(), "PARTICIPANT")
+
+    response = client.get(
+        f"/events/{uuid4()}/guests/{uuid4()}/check-in",
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 403
 
 
 def test_cancel_registration_soft_deletes_existing(
@@ -277,8 +349,12 @@ def test_cancel_registration_soft_deletes_existing(
     user_id = uuid4()
     db_session.add(Registration(event_id=event_id, user_id=user_id))
     db_session.commit()
+    override_auth_user(user_id)
 
-    response = client.delete(f"/events/{event_id}/guests/{user_id}")
+    response = client.delete(
+        f"/events/{event_id}/guests/{user_id}",
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 204
 
@@ -290,9 +366,26 @@ def test_cancel_registration_soft_deletes_existing(
 
 
 def test_cancel_registration_returns_404_when_missing(client: TestClient) -> None:
-    response = client.delete(f"/events/{uuid4()}/guests/{uuid4()}")
+    user_id = uuid4()
+    override_auth_user(user_id)
+
+    response = client.delete(
+        f"/events/{uuid4()}/guests/{user_id}",
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 404
+
+
+def test_cancel_registration_rejects_other_participant(client: TestClient) -> None:
+    override_auth_user(uuid4())
+
+    response = client.delete(
+        f"/events/{uuid4()}/guests/{uuid4()}",
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 403
 
 
 def test_list_activity_registrations_returns_user_ids(
@@ -310,8 +403,12 @@ def test_list_activity_registrations_returns_user_ids(
             )
         )
     db_session.commit()
+    override_auth_user(uuid4(), "MANAGER")
 
-    response = client.get(f"/activities/{activity_id}/registrations")
+    response = client.get(
+        f"/activities/{activity_id}/registrations",
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 200
     assert sorted(response.json()) == sorted(str(uid) for uid in user_ids)
@@ -321,11 +418,26 @@ def test_list_activity_registrations_returns_empty_list_when_none(
     client: TestClient,
 ) -> None:
     activity_id = uuid4()
+    override_auth_user(uuid4(), "MANAGER")
 
-    response = client.get(f"/activities/{activity_id}/registrations")
+    response = client.get(
+        f"/activities/{activity_id}/registrations",
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_list_activity_registrations_rejects_participant(client: TestClient) -> None:
+    override_auth_user(uuid4())
+
+    response = client.get(
+        f"/activities/{uuid4()}/registrations",
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 403
 
 
 def test_activity_registration_repository_finds_row(db_session: Session) -> None:
@@ -390,8 +502,12 @@ def test_get_activity_registration_endpoint_returns_row(
         )
     )
     db_session.commit()
+    override_auth_user(user_id)
 
-    response = client.get(f"/activities/{activity_id}/users/{user_id}")
+    response = client.get(
+        f"/activities/{activity_id}/users/{user_id}",
+        headers={"Authorization": "Bearer access-token"},
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -441,6 +557,7 @@ def test_post_activity_registration_endpoint_creates_row(
     activity_id = uuid4()
     user_id = uuid4()
     event_id = uuid4()
+    override_auth_user(user_id)
 
     response = client.post(
         "/activities/registrations",
@@ -449,6 +566,7 @@ def test_post_activity_registration_endpoint_creates_row(
             "userId": str(user_id),
             "eventId": str(event_id),
         },
+        headers={"Authorization": "Bearer access-token"},
     )
 
     assert response.status_code == 201
@@ -458,6 +576,24 @@ def test_post_activity_registration_endpoint_creates_row(
     assert payload["eventId"] == str(event_id)
     assert payload["createdAt"] is not None
     assert payload["updatedAt"] is not None
+
+
+def test_post_activity_registration_rejects_other_participant(
+    client: TestClient,
+) -> None:
+    override_auth_user(uuid4())
+
+    response = client.post(
+        "/activities/registrations",
+        json={
+            "activityId": str(uuid4()),
+            "userId": str(uuid4()),
+            "eventId": str(uuid4()),
+        },
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 403
 
 
 def test_validation_token_belongs_to_registration_domain_metadata() -> None:
