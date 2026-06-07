@@ -33,7 +33,7 @@ services:
     image: ministackorg/ministack:latest
     container_name: app-ministack
     ports:
-      - "4566:4566"
+      - "4567:4566"
     volumes:
       - ministack_data:/tmp/ministack
 

@@ -19,8 +19,9 @@ class RegistrationService:
         event_id: UUID,
         user_id: UUID,
         authenticated_user_id: UUID,
+        allow_different_user: bool = False,
     ) -> Registration:
-        if authenticated_user_id != user_id:
+        if authenticated_user_id != user_id and not allow_different_user:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Authenticated user does not match requested user",

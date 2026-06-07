@@ -4,7 +4,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from src.domain.auth.dependencies import get_current_user
+from src.domain.auth.dependencies import (
+    ensure_self_or_admin,
+    ensure_self_or_manager_or_admin,
+    get_current_user,
+    is_admin,
+    require_manager_or_admin,
+)
 from src.domain.auth.schemas import UserResponse
 
 from .schemas import (
@@ -36,7 +42,12 @@ def register(
     service: RegistrationService = Depends(get_registration_service),
     auth_user: UserResponse = Depends(get_current_user),
 ) -> RegistrationResponse:
-    registration = service.register(body.event_id, body.user_id, auth_user.id)
+    registration = service.register(
+        body.event_id,
+        body.user_id,
+        auth_user.id,
+        allow_different_user=is_admin(auth_user),
+    )
     return RegistrationResponse(
         eventId=registration.event_id,
         userId=registration.user_id,
@@ -89,7 +100,9 @@ def list_available_events() -> list[AvailableEventResponse]:
 def list_event_registrations(
     event_id: UUID,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(require_manager_or_admin),
 ) -> list[GuestRegistrationResponse]:
+    _ = auth_user
     registrations = service.list_event_registrations(event_id)
     return [
         GuestRegistrationResponse(
@@ -121,7 +134,9 @@ def list_event_registrations(
 def list_activity_registrations(
     activity_id: UUID,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(require_manager_or_admin),
 ) -> list[UUID]:
+    _ = auth_user
     return service.list_activity_user_ids(activity_id)
 
 
@@ -141,7 +156,9 @@ def get_activity_registration(
     activity_id: UUID,
     user_id: UUID,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> ActivityRegistrationResponse:
+    ensure_self_or_manager_or_admin(auth_user, user_id)
     registration = service.get_activity_registration(activity_id, user_id)
 
     if registration is None:
@@ -174,7 +191,9 @@ def get_activity_registration(
 def register_activity(
     body: ActivityRegistrationRequest,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> ActivityRegistrationResponse:
+    ensure_self_or_admin(auth_user, body.user_id)
     registration = service.register_activity(
         body.activity_id,
         body.user_id,
@@ -210,7 +229,12 @@ def register_guest(
     service: RegistrationService = Depends(get_registration_service),
     auth_user: UserResponse = Depends(get_current_user),
 ) -> GuestRegistrationResponse:
-    registration = service.register(event_id, body.user_id, auth_user.id)
+    registration = service.register(
+        event_id,
+        body.user_id,
+        auth_user.id,
+        allow_different_user=is_admin(auth_user),
+    )
     return GuestRegistrationResponse(
         event_id=registration.event_id,
         user_id=registration.user_id,
@@ -240,7 +264,9 @@ def cancel_guest_registration(
     event_id: UUID,
     user_id: UUID,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> None:
+    ensure_self_or_admin(auth_user, user_id)
     service.cancel_registration(event_id, user_id)
 
 
@@ -267,7 +293,9 @@ def validate_check_in(
     event_id: UUID,
     user_id: UUID,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(require_manager_or_admin),
 ) -> CheckInStatusResponse:
+    _ = auth_user
     registration = service.get_check_in_registration(event_id, user_id)
 
     if registration is None:
