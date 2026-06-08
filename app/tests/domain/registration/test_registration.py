@@ -432,10 +432,10 @@ def test_confirm_registration_returns_404_for_unknown_confirmation(
     response = client.post(
         f"/events/confirmation/{uuid4()}",
         json={"token": "ABCD1234"},
-
     )
 
     assert response.status_code == 404
+
 
 def test_validate_check_in_rejects_participant_role(client: TestClient) -> None:
     override_auth_user(uuid4(), "PARTICIPANT")
@@ -470,6 +470,7 @@ def test_cancel_registration_soft_deletes_existing(
     assert registration is not None
     assert registration.status == RegistrationStatus.CANCELLED
 
+
 def test_confirm_registration_rejects_malformed_token(client: TestClient) -> None:
     response = client.post(
         f"/events/confirmation/{uuid4()}",
@@ -477,6 +478,7 @@ def test_confirm_registration_rejects_malformed_token(client: TestClient) -> Non
     )
 
     assert response.status_code == 422
+
 
 def test_cancel_registration_rejects_other_participant(client: TestClient) -> None:
     override_auth_user(uuid4())

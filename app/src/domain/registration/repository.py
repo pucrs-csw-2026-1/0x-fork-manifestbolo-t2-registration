@@ -12,6 +12,7 @@ from src.database import get_db
 from .enums import RegistrationStatus
 from .model import ActivityRegistration, Registration, ValidationToken
 
+
 class RegistrationRepository:
     def __init__(self, db: Session) -> None:
         self.db = db

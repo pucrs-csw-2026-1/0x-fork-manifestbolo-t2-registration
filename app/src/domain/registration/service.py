@@ -1,6 +1,5 @@
 """Business logic for registrations."""
 
-
 from datetime import UTC, datetime, timedelta
 import secrets
 from string import ascii_letters, digits
@@ -116,7 +115,7 @@ class RegistrationService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Registration already confirmed.",
             )
-    
+
         # TODO: rejeitar cancelamento com 422 quando o evento já tiver ocorrido.
         # Depende do contrato real do events-service (EventsClient hoje é apenas
         # um placeholder), então a checagem fica pendente até a integração existir.
