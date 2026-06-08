@@ -1,30 +1,129 @@
-"""
-Schemas que modelam as respostas do microsserviço de Eventos.
-
-ATENÇÃO: Este é um EXEMPLO ILUSTRATIVO — os campos reais devem ser alinhados
-com o contrato (OpenAPI) exposto pelo microsserviço de eventos.
-Ajuste os tipos, nomes e campos conforme a documentação oficial do serviço.
-"""
+"""Schemas for the Events service HTTP contract."""
 
 from datetime import datetime
-from uuid import UUID
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-# ---------------------------------------------------------------------------
-# EXEMPLO — adapte conforme o contrato real do microsserviço de eventos
-# ---------------------------------------------------------------------------
+
+class EventLocation(BaseModel):
+    venue: str | None = None
+    address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class EventResponse(BaseModel):
-    """Representa um evento retornado pelo microsserviço de eventos.
+    id: str
+    title: str
+    description: str | None = None
+    starts_at: datetime
+    ends_at: datetime
+    timezone: str
+    registration_deadline: datetime | None = None
+    location: EventLocation | None = None
+    capacity: int
+    category: str | None = None
+    language: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime | None = None
+    deleted_by: str | None = None
+    created_by: str
 
-    EXEMPLO: campos hipotéticos — alinhe com o schema real do events-service.
-    """
+    model_config = ConfigDict(extra="ignore")
 
-    id: UUID = Field(..., description="ID único do evento")
-    name: str = Field(..., description="Nome do evento")
-    description: str | None = Field(None, description="Descrição do evento")
-    max_capacity: int = Field(..., description="Capacidade máxima de participantes")
-    start_at: datetime = Field(..., description="Data/hora de início do evento")
-    end_at: datetime = Field(..., description="Data/hora de encerramento do evento")
+
+class CreateEventRequest(BaseModel):
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    timezone: str
+    capacity: int
+    created_by: str
+    description: str | None = None
+    registration_deadline: datetime | None = None
+    location: EventLocation | dict[str, Any] | None = None
+    category: str | None = None
+    language: str | None = None
+
+
+class UpdateEventRequest(BaseModel):
+    title: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    timezone: str | None = None
+    capacity: int | None = None
+    created_by: str | None = None
+    description: str | None = None
+    registration_deadline: datetime | None = None
+    location: EventLocation | dict[str, Any] | None = None
+    category: str | None = None
+    language: str | None = None
+
+
+class EventListResponse(BaseModel):
+    data: list[EventResponse]
+    total: int
+    page: int
+    limit: int
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class ActivityResponse(BaseModel):
+    id_activity: str
+    title_activity: str
+    description_activity: str | None = None
+    type: str
+    starts_at: datetime
+    ends_at: datetime
+    timezone: str
+    registration_deadline_activity: datetime | None = None
+    thumbnail_url: str | None = None
+    capacity_activity: int | None = None
+    workload_minutes: int
+    category_activity: str | None = None
+    language_activity: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime | None = None
+    deleted_by: str | None = None
+    created_by: str
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class EventRoleResponse(BaseModel):
+    event_id: str
+    role: str
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class CreateEventRoleRequest(BaseModel):
+    role: str
+
+
+class EventsByStatus(BaseModel):
+    upcoming: int
+    ongoing: int
+    past: int
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class EventsMetricsResponse(BaseModel):
+    total_events: int
+    total_activitys: int
+    total_capacity: int
+    total_enrolled: int
+    total_available_spots: int
+    average_occupancy_percentage: float
+    events_by_category: dict[str, int] = Field(default_factory=dict)
+    events_by_status: EventsByStatus
+
+    model_config = ConfigDict(extra="ignore")
