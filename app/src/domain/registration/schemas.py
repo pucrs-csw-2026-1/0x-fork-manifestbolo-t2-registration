@@ -37,7 +37,7 @@ class RegistrationResponse(BaseModel):
 class AvailableEventResponse(BaseModel):
     """Representa um evento com vagas ainda abertas para inscrição."""
 
-    event_id: UUID = Field(..., alias="eventId", description="ID único do evento")
+    event_id: str = Field(..., alias="eventId", description="ID único do evento")
     name: str = Field(..., description="Nome do evento")
     max_capacity: int = Field(
         ...,

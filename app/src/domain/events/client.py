@@ -1,12 +1,10 @@
 """HTTP client for the Events service."""
 
-from collections.abc import Mapping
 import logging
 from typing import Any, TypeVar
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
-from fastapi.encoders import jsonable_encoder
 import httpx
 from pydantic import BaseModel
 
@@ -14,13 +12,10 @@ from src.config import Settings, get_settings
 
 from .schemas import (
     ActivityResponse,
-    CreateEventRequest,
-    CreateEventRoleRequest,
     EventListResponse,
     EventResponse,
     EventRoleResponse,
     EventsMetricsResponse,
-    UpdateEventRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,13 +41,6 @@ class EventsClient:
         self._base_url = base_url or app_settings.EVENTS_SERVICE_BASE_URL
         self._timeout = timeout
         self._transport = transport
-
-    def create_event(
-        self,
-        event: CreateEventRequest | Mapping[str, Any],
-    ) -> EventResponse:
-        response = self._request("POST", "/events", json=self._json_payload(event))
-        return self._parse_response(response, EventResponse)
 
     def list_events(self, page: int = 1, limit: int = 20) -> EventListResponse:
         response = self._request(
@@ -85,34 +73,6 @@ class EventsClient:
             return None
         return self._parse_response(response, EventResponse)
 
-    def replace_event(
-        self,
-        event_id: str | UUID,
-        event: CreateEventRequest | Mapping[str, Any],
-    ) -> EventResponse:
-        response = self._request(
-            "PUT",
-            self._event_path(event_id),
-            json=self._json_payload(event),
-        )
-        return self._parse_response(response, EventResponse)
-
-    def update_event(
-        self,
-        event_id: str | UUID,
-        event: UpdateEventRequest | Mapping[str, Any],
-    ) -> EventResponse:
-        response = self._request(
-            "PATCH",
-            self._event_path(event_id),
-            json=self._json_payload(event),
-        )
-        return self._parse_response(response, EventResponse)
-
-    def delete_event(self, event_id: str | UUID) -> EventResponse:
-        response = self._request("DELETE", self._event_path(event_id))
-        return self._parse_response(response, EventResponse)
-
     def get_events_metrics(self) -> EventsMetricsResponse:
         response = self._request("GET", "/events/metrics")
         return self._parse_response(response, EventsMetricsResponse)
@@ -129,22 +89,6 @@ class EventsClient:
     def list_event_roles(self, event_id: str | UUID) -> list[EventRoleResponse]:
         response = self._request("GET", f"{self._event_path(event_id)}/roles")
         return self._parse_response_list(response, EventRoleResponse)
-
-    def add_event_role(
-        self,
-        event_id: str | UUID,
-        role: str | CreateEventRoleRequest | Mapping[str, Any],
-    ) -> EventRoleResponse:
-        payload = role if not isinstance(role, str) else {"role": role}
-        response = self._request(
-            "POST",
-            f"{self._event_path(event_id)}/roles",
-            json=self._json_payload(payload),
-        )
-        return self._parse_response(response, EventRoleResponse)
-
-    def remove_event_role(self, event_id: str | UUID, role: str) -> None:
-        self._request("DELETE", f"{self._event_path(event_id)}/roles/{role}")
 
     def _request(
         self,
@@ -172,13 +116,6 @@ class EventsClient:
 
         self._raise_for_error(response, allow_not_found=allow_not_found)
         return response
-
-    @staticmethod
-    def _json_payload(payload: BaseModel | Mapping[str, Any]) -> dict[str, Any]:
-        encoded = jsonable_encoder(payload, exclude_none=True)
-        if not isinstance(encoded, dict):
-            raise TypeError("Events service payload must be a JSON object")
-        return encoded
 
     @staticmethod
     def _parse_response(response: httpx.Response, model: type[ModelT]) -> ModelT:
