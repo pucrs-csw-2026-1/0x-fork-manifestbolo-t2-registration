@@ -34,6 +34,9 @@ indent-style = "space"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
+markers = [
+    "integration: tests that require external services running",
+]
 
 [tool.alembic]
 script_location = "migrations"

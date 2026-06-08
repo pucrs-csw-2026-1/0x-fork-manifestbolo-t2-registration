@@ -51,4 +51,4 @@ jobs:
 
       - name: Run tests
         working-directory: app
-        run: pytest -v --tb=short
+        run: pytest -v --tb=short -m "not integration"

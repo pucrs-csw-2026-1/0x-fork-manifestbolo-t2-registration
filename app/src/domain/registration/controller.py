@@ -5,7 +5,18 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from src.domain.auth.dependencies import (
+    ensure_self_or_admin,
+    ensure_self_or_manager_or_admin,
+    get_current_user,
+    is_admin,
+    require_manager_or_admin,
+)
+from src.domain.auth.schemas import UserResponse
+
 from .schemas import (
+    ActivityRegistrationRequest,
+    ActivityRegistrationResponse,
     AvailableEventResponse,
     CheckInStatusResponse,
     ConfirmationCodeRequest,
@@ -30,14 +41,20 @@ router = APIRouter(tags=["registration"])
 def register(
     body: RegistrationCreateRequest,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> RegistrationResponse:
-    registration = service.register(body.event_id, body.user_id)
+    registration = service.register(
+        body.event_id,
+        body.user_id,
+        auth_user.id,
+        allow_different_user=is_admin(auth_user),
+    )
     return RegistrationResponse(
-        event_id=registration.event_id,
-        user_id=registration.user_id,
+        eventId=registration.event_id,
+        userId=registration.user_id,
         status=registration.status,
-        created_at=registration.created_at,
-        updated_at=registration.updated_at,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
     )
 
 
@@ -84,18 +101,112 @@ def list_available_events() -> list[AvailableEventResponse]:
 def list_event_registrations(
     event_id: UUID,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(require_manager_or_admin),
 ) -> list[GuestRegistrationResponse]:
+    _ = auth_user
     registrations = service.list_event_registrations(event_id)
     return [
         GuestRegistrationResponse(
-            event_id=r.event_id,
-            user_id=r.user_id,
+            eventId=r.event_id,
+            userId=r.user_id,
             status=r.status,
-            created_at=r.created_at,
-            updated_at=r.updated_at,
+            createdAt=r.created_at,
+            updatedAt=r.updated_at,
         )
         for r in registrations
     ]
+
+
+# ---------------------------------------------------------------------------
+# GET /activities/{activity_id}/registrations – user ids inscritos numa atividade
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/activities/{activity_id}/registrations",
+    response_model=list[UUID],
+    status_code=status.HTTP_200_OK,
+    summary="Lista os ids de usuários inscritos em uma atividade",
+    description=(
+        "Retorna um array com os `userId` de todos os usuários inscritos na atividade "
+        "informada. Quando a atividade não possui inscritos, retorna 200 com um array vazio."
+    ),
+)
+def list_activity_registrations(
+    activity_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(require_manager_or_admin),
+) -> list[UUID]:
+    _ = auth_user
+    return service.list_activity_user_ids(activity_id)
+
+
+# ---------------------------------------------------------------------------
+# GET /activities/{activity_id}/users/{user_id} – inscrição em atividade
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/activities/{activity_id}/users/{user_id}",
+    response_model=ActivityRegistrationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Busca a inscrição de um usuário em uma atividade",
+    description="Consulta no banco de dados deste serviço a inscrição informada por atividade e usuário.",
+)
+def get_activity_registration(
+    activity_id: UUID,
+    user_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
+) -> ActivityRegistrationResponse:
+    ensure_self_or_manager_or_admin(auth_user, user_id)
+    registration = service.get_activity_registration(activity_id, user_id)
+
+    if registration is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Registration not found.",
+        )
+
+    return ActivityRegistrationResponse(
+        activityId=registration.activity_id,
+        userId=registration.user_id,
+        eventId=registration.event_id,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /activities/registrations – inscrição em atividade
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/activities/registrations",
+    response_model=ActivityRegistrationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Cria uma inscrição em atividade",
+    description="Cria uma inscrição de usuário em uma atividade com base no payload informado.",
+)
+def register_activity(
+    body: ActivityRegistrationRequest,
+    service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
+) -> ActivityRegistrationResponse:
+    ensure_self_or_admin(auth_user, body.user_id)
+    registration = service.register_activity(
+        body.activity_id,
+        body.user_id,
+        body.event_id,
+    )
+    return ActivityRegistrationResponse(
+        activityId=registration.activity_id,
+        userId=registration.user_id,
+        eventId=registration.event_id,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -116,11 +227,21 @@ def list_event_registrations(
 def register_guest(
     event_id: UUID,
     body: GuestRegistrationRequest,
+    service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> GuestRegistrationResponse:
-    # TODO: validar vagas, consultar evento no microserviço externo e salvar inscrição
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
+    registration = service.register(
+        event_id,
+        body.user_id,
+        auth_user.id,
+        allow_different_user=is_admin(auth_user),
+    )
+    return GuestRegistrationResponse(
+        event_id=registration.event_id,
+        user_id=registration.user_id,
+        status=registration.status,
+        created_at=registration.created_at,
+        updated_at=registration.updated_at,
     )
 
 
@@ -143,12 +264,11 @@ def register_guest(
 def cancel_guest_registration(
     event_id: UUID,
     user_id: UUID,
+    service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(get_current_user),
 ) -> None:
-    # TODO: verificar se o evento ainda não ocorreu, localizar a inscrição e removê-la
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
-    )
+    ensure_self_or_admin(auth_user, user_id)
+    service.cancel_registration(event_id, user_id)
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +294,9 @@ def validate_check_in(
     event_id: UUID,
     user_id: UUID,
     service: RegistrationService = Depends(get_registration_service),
+    auth_user: UserResponse = Depends(require_manager_or_admin),
 ) -> CheckInStatusResponse:
+    _ = auth_user
     registration = service.get_check_in_registration(event_id, user_id)
 
     if registration is None:
@@ -184,11 +306,11 @@ def validate_check_in(
         )
 
     return CheckInStatusResponse(
-        event_id=event_id,
-        user_id=user_id,
+        eventId=event_id,
+        userId=user_id,
         status=registration.status,
-        created_at=registration.created_at,
-        updated_at=registration.updated_at,
+        createdAt=registration.created_at,
+        updatedAt=registration.updated_at,
     )
 
 
