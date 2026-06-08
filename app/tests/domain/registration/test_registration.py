@@ -12,6 +12,8 @@ from main import app
 from src.database import Base
 from src.domain.auth.client import get_auth_client
 from src.domain.auth.schemas import UserResponse
+from src.domain.events.client import get_events_client
+from src.domain.events.schemas import ActivityResponse, EventResponse
 from src.domain.registration.enums import RegistrationStatus
 from src.domain.registration.model import (
     ActivityRegistration,
@@ -63,6 +65,77 @@ class FakeAuthClient:
         return self.user
 
 
+class FakeEventsClient:
+    def __init__(
+        self,
+        events: list[EventResponse],
+        activities: list[ActivityResponse] | None = None,
+    ) -> None:
+        self.events = events
+        self.activities = activities or []
+
+    def get_all_events(self) -> list[EventResponse]:
+        return self.events
+
+    def get_event_by_id(self, event_id: str | UUID) -> EventResponse | None:
+        event_id_text = str(event_id)
+        return next((event for event in self.events if event.id == event_id_text), None)
+
+    def list_event_activities(self, event_id: str | UUID) -> list[ActivityResponse]:
+        _ = event_id
+        return self.activities
+
+
+def event_response(
+    event_id: str,
+    *,
+    title: str = "Evento Teste",
+    capacity: int = 10,
+    ends_at: datetime | None = None,
+    deleted_at: datetime | None = None,
+) -> EventResponse:
+    now = datetime.now(UTC)
+    return EventResponse(
+        id=event_id,
+        title=title,
+        starts_at=now + timedelta(days=1),
+        ends_at=ends_at or now + timedelta(days=2),
+        timezone="America/Sao_Paulo",
+        capacity=capacity,
+        created_at=now,
+        updated_at=now,
+        deleted_at=deleted_at,
+        deleted_by=None,
+        created_by="usr_123",
+    )
+
+
+def activity_response(
+    activity_id: str,
+    *,
+    title: str = "Atividade Teste",
+    capacity: int | None = 10,
+    ends_at: datetime | None = None,
+    deleted_at: datetime | None = None,
+) -> ActivityResponse:
+    now = datetime.now(UTC)
+    return ActivityResponse(
+        id_activity=activity_id,
+        title_activity=title,
+        type="palestra",
+        starts_at=now + timedelta(days=1),
+        ends_at=ends_at or now + timedelta(days=2),
+        timezone="America/Sao_Paulo",
+        capacity_activity=capacity,
+        workload_minutes=60,
+        created_at=now,
+        updated_at=now,
+        deleted_at=deleted_at,
+        deleted_by=None,
+        created_by="usr_123",
+    )
+
+
 def override_auth_user(user_id: UUID, access_level: str = "PARTICIPANT") -> None:
     user = UserResponse(
         id=user_id,
@@ -80,10 +153,25 @@ def override_auth_exception(exception: HTTPException) -> None:
     )
 
 
+def override_events(
+    events: list[EventResponse],
+    activities: list[ActivityResponse] | None = None,
+) -> None:
+    app.dependency_overrides[get_events_client] = lambda: FakeEventsClient(
+        events,
+        activities,
+    )
+
+
+def override_open_event(event_id: UUID, capacity: int = 10) -> None:
+    override_events([event_response(str(event_id), capacity=capacity)])
+
+
 def test_register_endpoint_creates_registration(client: TestClient) -> None:
     event_id = uuid4()
     user_id = uuid4()
     override_auth_user(user_id)
+    override_open_event(event_id)
 
     response = client.post(
         f"/events/{event_id}/guests",
@@ -100,12 +188,96 @@ def test_register_endpoint_creates_registration(client: TestClient) -> None:
     assert payload["updatedAt"] is None
 
 
+def test_list_available_events_crosses_events_capacity_with_local_registrations(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    available_event_id = uuid4()
+    full_event_id = uuid4()
+    removed_event_id = uuid4()
+    past_event_id = uuid4()
+    now = datetime.now(UTC)
+    user_registered_in_event_and_activity = uuid4()
+
+    db_session.add(
+        Registration(
+            event_id=available_event_id,
+            user_id=user_registered_in_event_and_activity,
+        ),
+    )
+    db_session.add(
+        ActivityRegistration(
+            event_id=available_event_id,
+            user_id=user_registered_in_event_and_activity,
+            activity_id=uuid4(),
+        )
+    )
+    db_session.add(
+        Registration(
+            event_id=available_event_id,
+            user_id=uuid4(),
+            status=RegistrationStatus.CONFIRMED,
+        ),
+    )
+    db_session.add(
+        Registration(
+            event_id=available_event_id,
+            user_id=uuid4(),
+            status=RegistrationStatus.CANCELLED,
+        ),
+    )
+    db_session.add(Registration(event_id=full_event_id, user_id=uuid4()))
+    db_session.add(
+        ActivityRegistration(
+            event_id=full_event_id,
+            user_id=uuid4(),
+            activity_id=uuid4(),
+        )
+    )
+    db_session.commit()
+
+    override_events(
+        [
+            event_response(
+                str(available_event_id),
+                title="Evento com vagas",
+                capacity=3,
+            ),
+            event_response(str(full_event_id), title="Evento lotado", capacity=2),
+            event_response(
+                str(removed_event_id),
+                title="Evento removido",
+                deleted_at=now,
+            ),
+            event_response(
+                str(past_event_id),
+                title="Evento encerrado",
+                ends_at=now - timedelta(minutes=1),
+            ),
+        ]
+    )
+
+    response = client.get("/events/available")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "eventId": str(available_event_id),
+            "name": "Evento com vagas",
+            "maxCapacity": 3,
+            "registeredCount": 2,
+            "availableSlots": 1,
+        }
+    ]
+
+
 def test_register_endpoint_creates_authentication_token(
     client: TestClient, db_session: Session
 ) -> None:
     event_id = uuid4()
     user_id = uuid4()
     override_auth_user(user_id)
+    override_open_event(event_id)
 
     response = client.post(
         f"/events/{event_id}/guests",
@@ -150,11 +322,12 @@ def test_registration_service_rejects_duplicates(db_session: Session) -> None:
     service = RegistrationService(repository)
     event_id = uuid4()
     user_id = uuid4()
+    events_client = FakeEventsClient([event_response(str(event_id))])
 
-    service.register(event_id, user_id, user_id)
+    service.register(event_id, user_id, user_id, events_client)  # type: ignore[arg-type]
 
     try:
-        service.register(event_id, user_id, user_id)
+        service.register(event_id, user_id, user_id, events_client)  # type: ignore[arg-type]
     except Exception as exc:  # noqa: BLE001
         assert getattr(exc, "status_code", None) == 409
     else:
@@ -168,7 +341,12 @@ def test_registration_service_rejects_identity_mismatch(
     service = RegistrationService(repository)
 
     with pytest.raises(HTTPException) as exc_info:
-        service.register(uuid4(), uuid4(), uuid4())
+        service.register(
+            uuid4(),
+            uuid4(),
+            uuid4(),
+            FakeEventsClient([]),  # type: ignore[arg-type]
+        )
 
     assert exc_info.value.status_code == 403
 
@@ -188,6 +366,7 @@ def test_post_register_accepts_matching_authenticated_user(
     event_id = uuid4()
     user_id = uuid4()
     override_auth_user(user_id)
+    override_open_event(event_id)
 
     response = client.post(
         "/register",
@@ -221,6 +400,7 @@ def test_post_register_allows_admin_to_register_other_user(
     event_id = uuid4()
     target_user_id = uuid4()
     override_auth_user(uuid4(), "ADMIN")
+    override_open_event(event_id)
 
     response = client.post(
         "/register",
@@ -232,6 +412,102 @@ def test_post_register_allows_admin_to_register_other_user(
     payload = response.json()
     assert payload["eventId"] == str(event_id)
     assert payload["userId"] == str(target_user_id)
+
+
+def test_post_register_rejects_past_event(client: TestClient) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    now = datetime.now(UTC)
+    override_auth_user(user_id)
+    override_events([event_response(str(event_id), ends_at=now - timedelta(minutes=1))])
+
+    response = client.post(
+        "/register",
+        json={"eventId": str(event_id), "userId": str(user_id)},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 422
+    assert (
+        response.json()["detail"] == "Event already happened or is no longer available."
+    )
+
+
+def test_post_register_rejects_full_event(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    db_session.add(Registration(event_id=event_id, user_id=uuid4()))
+    db_session.commit()
+    override_auth_user(user_id)
+    override_open_event(event_id, capacity=1)
+
+    response = client.post(
+        "/register",
+        json={"eventId": str(event_id), "userId": str(user_id)},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Event is full."
+
+
+def test_register_guest_rejects_full_event(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    db_session.add(Registration(event_id=event_id, user_id=uuid4()))
+    db_session.commit()
+    override_auth_user(user_id)
+    override_open_event(event_id, capacity=1)
+
+    response = client.post(
+        f"/events/{event_id}/guests",
+        json={"userId": str(user_id)},
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Event is full."
+
+
+def test_register_activity_rejects_full_event_from_activity_registrations(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    event_id = uuid4()
+    activity_id = uuid4()
+    user_id = uuid4()
+    db_session.add(
+        ActivityRegistration(
+            activity_id=uuid4(),
+            user_id=uuid4(),
+            event_id=event_id,
+        )
+    )
+    db_session.commit()
+    override_auth_user(user_id)
+    override_events(
+        [event_response(str(event_id), capacity=1)],
+        [activity_response(str(activity_id))],
+    )
+
+    response = client.post(
+        "/activities/registrations",
+        json={
+            "activityId": str(activity_id),
+            "userId": str(user_id),
+            "eventId": str(event_id),
+        },
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Event is full."
 
 
 def test_post_register_returns_503_when_auth_fails(
@@ -646,8 +922,17 @@ def test_activity_registration_service_creates_row(db_session: Session) -> None:
     activity_id = uuid4()
     user_id = uuid4()
     event_id = uuid4()
+    events_client = FakeEventsClient(
+        [event_response(str(event_id))],
+        [activity_response(str(activity_id))],
+    )
 
-    registration = service.register_activity(activity_id, user_id, event_id)
+    registration = service.register_activity(
+        activity_id,
+        user_id,
+        event_id,
+        events_client,  # type: ignore[arg-type]
+    )
 
     assert registration.activity_id == activity_id
     assert registration.user_id == user_id
@@ -661,6 +946,10 @@ def test_post_activity_registration_endpoint_creates_row(
     user_id = uuid4()
     event_id = uuid4()
     override_auth_user(user_id)
+    override_events(
+        [event_response(str(event_id))],
+        [activity_response(str(activity_id))],
+    )
 
     response = client.post(
         "/activities/registrations",
@@ -697,6 +986,66 @@ def test_post_activity_registration_rejects_other_participant(
     )
 
     assert response.status_code == 403
+
+
+def test_post_activity_registration_rejects_past_activity(client: TestClient) -> None:
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+    now = datetime.now(UTC)
+    override_auth_user(user_id)
+    override_events(
+        [event_response(str(event_id))],
+        [activity_response(str(activity_id), ends_at=now - timedelta(minutes=1))],
+    )
+
+    response = client.post(
+        "/activities/registrations",
+        json={
+            "activityId": str(activity_id),
+            "userId": str(user_id),
+            "eventId": str(event_id),
+        },
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Activity already happened."
+
+
+def test_post_activity_registration_rejects_full_activity(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    activity_id = uuid4()
+    user_id = uuid4()
+    event_id = uuid4()
+    db_session.add(
+        ActivityRegistration(
+            activity_id=activity_id,
+            user_id=uuid4(),
+            event_id=event_id,
+        )
+    )
+    db_session.commit()
+    override_auth_user(user_id)
+    override_events(
+        [event_response(str(event_id))],
+        [activity_response(str(activity_id), capacity=1)],
+    )
+
+    response = client.post(
+        "/activities/registrations",
+        json={
+            "activityId": str(activity_id),
+            "userId": str(user_id),
+            "eventId": str(event_id),
+        },
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Activity is full."
 
 
 def test_validation_token_belongs_to_registration_domain_metadata() -> None:

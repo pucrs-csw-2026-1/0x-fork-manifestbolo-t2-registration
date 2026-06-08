@@ -1,7 +1,6 @@
 """Schemas for the Events service HTTP contract."""
 
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,34 +34,6 @@ class EventResponse(BaseModel):
     created_by: str
 
     model_config = ConfigDict(extra="ignore")
-
-
-class CreateEventRequest(BaseModel):
-    title: str
-    starts_at: datetime
-    ends_at: datetime
-    timezone: str
-    capacity: int
-    created_by: str
-    description: str | None = None
-    registration_deadline: datetime | None = None
-    location: EventLocation | dict[str, Any] | None = None
-    category: str | None = None
-    language: str | None = None
-
-
-class UpdateEventRequest(BaseModel):
-    title: str | None = None
-    starts_at: datetime | None = None
-    ends_at: datetime | None = None
-    timezone: str | None = None
-    capacity: int | None = None
-    created_by: str | None = None
-    description: str | None = None
-    registration_deadline: datetime | None = None
-    location: EventLocation | dict[str, Any] | None = None
-    category: str | None = None
-    language: str | None = None
 
 
 class EventListResponse(BaseModel):
@@ -102,10 +73,6 @@ class EventRoleResponse(BaseModel):
     role: str
 
     model_config = ConfigDict(extra="ignore")
-
-
-class CreateEventRoleRequest(BaseModel):
-    role: str
 
 
 class EventsByStatus(BaseModel):

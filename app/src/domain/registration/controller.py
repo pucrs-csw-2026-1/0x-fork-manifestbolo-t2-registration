@@ -13,6 +13,7 @@ from src.domain.auth.dependencies import (
     require_manager_or_admin,
 )
 from src.domain.auth.schemas import UserResponse
+from src.domain.events.client import EventsClient, get_events_client
 
 from .schemas import (
     ActivityRegistrationRequest,
@@ -42,11 +43,13 @@ def register(
     body: RegistrationCreateRequest,
     service: RegistrationService = Depends(get_registration_service),
     auth_user: UserResponse = Depends(get_current_user),
+    events_client: EventsClient = Depends(get_events_client),
 ) -> RegistrationResponse:
     registration = service.register(
         body.event_id,
         body.user_id,
         auth_user.id,
+        events_client,
         allow_different_user=is_admin(auth_user),
     )
     return RegistrationResponse(
@@ -77,13 +80,11 @@ def register(
         "Retorna apenas os eventos que ainda estão dentro do prazo e possuem vagas disponíveis."
     ),
 )
-def list_available_events() -> list[AvailableEventResponse]:
-    # TODO: chamar o microserviço de eventos via HTTP, filtrar eventos não encerrados
-    # (data_fim >= now()) e cruzar capacidade máxima com contagem local de inscrições
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
-    )
+def list_available_events(
+    service: RegistrationService = Depends(get_registration_service),
+    events_client: EventsClient = Depends(get_events_client),
+) -> list[AvailableEventResponse]:
+    return service.list_available_events(events_client)
 
 
 # ---------------------------------------------------------------------------
@@ -193,12 +194,14 @@ def register_activity(
     body: ActivityRegistrationRequest,
     service: RegistrationService = Depends(get_registration_service),
     auth_user: UserResponse = Depends(get_current_user),
+    events_client: EventsClient = Depends(get_events_client),
 ) -> ActivityRegistrationResponse:
     ensure_self_or_admin(auth_user, body.user_id)
     registration = service.register_activity(
         body.activity_id,
         body.user_id,
         body.event_id,
+        events_client,
     )
     return ActivityRegistrationResponse(
         activityId=registration.activity_id,
@@ -229,11 +232,13 @@ def register_guest(
     body: GuestRegistrationRequest,
     service: RegistrationService = Depends(get_registration_service),
     auth_user: UserResponse = Depends(get_current_user),
+    events_client: EventsClient = Depends(get_events_client),
 ) -> GuestRegistrationResponse:
     registration = service.register(
         event_id,
         body.user_id,
         auth_user.id,
+        events_client,
         allow_different_user=is_admin(auth_user),
     )
     return GuestRegistrationResponse(
