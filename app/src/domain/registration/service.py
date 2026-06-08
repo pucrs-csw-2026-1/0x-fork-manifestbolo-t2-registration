@@ -92,6 +92,17 @@ class RegistrationService:
         registration = self.repository.get_by_event_and_user(
             validation_token.event_id, validation_token.user_id
         )
+        if registration is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Registration not found.",
+            )
+
+        if registration.status == RegistrationStatus.CONFIRMED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Registration already confirmed.",
+            )
 
         if token != validation_token.token:
             raise HTTPException(
@@ -107,12 +118,6 @@ class RegistrationService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Registration not found.",
-            )
-
-        if registration.status == RegistrationStatus.CONFIRMED:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Registration already confirmed.",
             )
 
         # TODO: rejeitar cancelamento com 422 quando o evento já tiver ocorrido.
