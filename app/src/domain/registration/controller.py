@@ -1,5 +1,6 @@
 """HTTP controller for the registration endpoint."""
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -345,20 +346,12 @@ def validate_check_in(
 def confirm_registration(
     confirmation_id: UUID,
     body: ConfirmationCodeRequest,
-    auth_user: UserResponse = Depends(get_current_user),
+    service: RegistrationService = Depends(get_registration_service),
 ) -> ConfirmationResponse:
-    _ = (confirmation_id, body, auth_user)
-    # TODO: buscar o token de validação pelo confirmation_id na tabela authentication_tokens
-    #   → 404 se não existir
-    # TODO: verificar se expires_at < now()
-    #   → 410 Gone se expirado
-    # TODO: verificar se a inscrição correspondente já está com status CONFIRMED
-    #   → 409 Conflict se já confirmado
-    # TODO: comparar body.token com o campo `token` do registro
-    #   → 400 Bad Request se divergir
-    # TODO: atualizar status = CONFIRMED na tabela registrations
-    #   → updated_at deve ser preenchido automaticamente
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint ainda não implementado.",
+    registration = service.confirm(confirmation_id, body.token)
+    return ConfirmationResponse(
+        confirmation_id=confirmation_id,
+        event_id=registration.event_id,
+        user_id=registration.user_id,
+        confirmed_at=registration.updated_at or datetime.now(UTC),
     )

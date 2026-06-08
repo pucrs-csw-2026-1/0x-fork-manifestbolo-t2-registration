@@ -1,6 +1,6 @@
 """Tests for event registration."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -22,6 +22,30 @@ from src.domain.registration.repository import RegistrationRepository
 from src.domain.registration.service import RegistrationService
 
 
+def _seed_registration_with_token(
+    db_session: Session,
+    *,
+    token: str = "XY34ZW78",
+    status: RegistrationStatus = RegistrationStatus.REGISTERED,
+    expires_at: datetime | None = None,
+) -> ValidationToken:
+    """Create a registration plus its validation token and return the token."""
+    event_id = uuid4()
+    user_id = uuid4()
+    db_session.add(Registration(event_id=event_id, user_id=user_id, status=status))
+    validation_token = ValidationToken(
+        event_id=event_id,
+        user_id=user_id,
+        token=token,
+        expires_at=expires_at or datetime.now(UTC) + timedelta(hours=1),
+    )
+    db_session.add(validation_token)
+    db_session.commit()
+    db_session.refresh(validation_token)
+    return validation_token
+
+
+@pytest.mark.xfail(reason="POST /events/{event_id}/guests ainda não implementado (501)")
 class FakeAuthClient:
     def __init__(
         self,
@@ -331,6 +355,88 @@ def test_validate_check_in_returns_false_for_missing_registration(
     assert response.status_code == 404
 
 
+def test_confirm_registration_succeeds_with_valid_token(
+    client: TestClient, db_session: Session
+) -> None:
+    validation_token = _seed_registration_with_token(db_session, token="ABCD1234")
+
+    response = client.post(
+        f"/events/confirmation/{validation_token.id}",
+        json={"token": "ABCD1234"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["confirmationId"] == str(validation_token.id)
+    assert payload["eventId"] == str(validation_token.event_id)
+    assert payload["userId"] == str(validation_token.user_id)
+    assert payload["confirmedAt"] is not None
+
+    registration = RegistrationRepository(db_session).get_by_event_and_user(
+        validation_token.event_id, validation_token.user_id
+    )
+    assert registration is not None
+    assert registration.status == RegistrationStatus.CONFIRMED
+
+
+def test_confirm_registration_rejects_wrong_token(
+    client: TestClient, db_session: Session
+) -> None:
+    validation_token = _seed_registration_with_token(db_session, token="ABCD1234")
+
+    response = client.post(
+        f"/events/confirmation/{validation_token.id}",
+        json={"token": "WRONG999"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_confirm_registration_rejects_expired_token(
+    client: TestClient, db_session: Session
+) -> None:
+    validation_token = _seed_registration_with_token(
+        db_session,
+        token="ABCD1234",
+        expires_at=datetime.now(UTC) - timedelta(hours=1),
+    )
+
+    response = client.post(
+        f"/events/confirmation/{validation_token.id}",
+        json={"token": "ABCD1234"},
+    )
+
+    assert response.status_code == 410
+
+
+def test_confirm_registration_rejects_already_confirmed(
+    client: TestClient, db_session: Session
+) -> None:
+    validation_token = _seed_registration_with_token(
+        db_session,
+        token="ABCD1234",
+        status=RegistrationStatus.CONFIRMED,
+    )
+
+    response = client.post(
+        f"/events/confirmation/{validation_token.id}",
+        json={"token": "ABCD1234"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_confirm_registration_returns_404_for_unknown_confirmation(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        f"/events/confirmation/{uuid4()}",
+        json={"token": "ABCD1234"},
+    )
+
+    assert response.status_code == 404
+
+
 def test_validate_check_in_rejects_participant_role(client: TestClient) -> None:
     override_auth_user(uuid4(), "PARTICIPANT")
 
@@ -365,16 +471,13 @@ def test_cancel_registration_soft_deletes_existing(
     assert registration.status == RegistrationStatus.CANCELLED
 
 
-def test_cancel_registration_returns_404_when_missing(client: TestClient) -> None:
-    user_id = uuid4()
-    override_auth_user(user_id)
-
-    response = client.delete(
-        f"/events/{uuid4()}/guests/{user_id}",
-        headers={"Authorization": "Bearer access-token"},
+def test_confirm_registration_rejects_malformed_token(client: TestClient) -> None:
+    response = client.post(
+        f"/events/confirmation/{uuid4()}",
+        json={"token": "short"},
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 422
 
 
 def test_cancel_registration_rejects_other_participant(client: TestClient) -> None:

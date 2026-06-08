@@ -78,6 +78,13 @@ class RegistrationRepository:
         self.db.refresh(registration)
         return registration
 
+    def get_validation_token(self, confirmation_id: UUID) -> ValidationToken | None:
+        return (
+            self.db.query(ValidationToken)
+            .filter(ValidationToken.id == confirmation_id)
+            .first()
+        )
+
     def create_with_authentication_token(
         self,
         event_id: UUID,
