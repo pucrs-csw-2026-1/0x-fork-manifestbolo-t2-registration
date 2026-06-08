@@ -8,7 +8,6 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-
 from src.config import get_settings
 
 from .enums import RegistrationStatus
