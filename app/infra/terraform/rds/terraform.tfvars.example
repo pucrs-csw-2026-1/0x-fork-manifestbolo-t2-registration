@@ -1,0 +1,6 @@
+aws_region         = "us-east-1"
+ministack_endpoint = "http://host.docker.internal:4566"
+db_name            = "app_db"
+db_username        = "postgres"
+db_password        = "postgres" # trocar em ambientes reais
+db_instance_class  = "db.t3.micro"
