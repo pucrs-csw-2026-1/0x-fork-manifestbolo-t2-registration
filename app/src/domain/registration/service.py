@@ -11,6 +11,15 @@ from sqlalchemy.exc import IntegrityError
 from src.config import get_settings
 from src.domain.events.client import EventsClient
 from src.domain.events.schemas import ActivityResponse, EventResponse
+from src.domain.notifications.publisher import (
+    SnsEventPublisher,
+    get_sns_event_publisher,
+)
+from src.domain.notifications.schemas import (
+    REGISTRATION_TOPIC_SOURCE,
+    DomainEvent,
+    DomainEventType,
+)
 
 from .enums import RegistrationStatus
 from .model import ActivityRegistration, Registration
@@ -19,8 +28,29 @@ from .schemas import AvailableEventResponse
 
 
 class RegistrationService:
-    def __init__(self, repository: RegistrationRepository) -> None:
+    def __init__(
+        self,
+        repository: RegistrationRepository,
+        event_publisher: SnsEventPublisher | None = None,
+    ) -> None:
         self.repository = repository
+        self.event_publisher = event_publisher
+
+    def _publish_registration_event(
+        self,
+        event_type: DomainEventType,
+        registration: Registration,
+    ) -> None:
+        if self.event_publisher is None:
+            return
+
+        domain_event = DomainEvent(
+            event_id=registration.event_id,
+            event_type=event_type,
+            source=REGISTRATION_TOPIC_SOURCE,
+            resource_ref=f"{registration.event_id}:{registration.user_id}",
+        )
+        self.event_publisher.publish(domain_event)
 
     def _generate_authentication_token(self) -> str:
         alphabet = ascii_letters + digits
@@ -155,7 +185,13 @@ class RegistrationService:
                 detail="Invalid confirmation token.",
             )
 
-        return self.repository.update_status(registration, RegistrationStatus.CONFIRMED)
+        confirmed_registration = self.repository.update_status(
+            registration, RegistrationStatus.CONFIRMED
+        )
+        self._publish_registration_event(
+            DomainEventType.REGISTRATION_CONFIRMED, confirmed_registration
+        )
+        return confirmed_registration
 
     def cancel_registration(self, event_id: UUID, user_id: UUID) -> None:
         registration = self.repository.get_by_event_and_user(event_id, user_id)
@@ -172,7 +208,12 @@ class RegistrationService:
         # Soft delete: mantém o histórico marcando a inscrição como CANCELLED.
         # Idempotente: cancelar uma inscrição já cancelada também retorna 204.
         if registration.status != RegistrationStatus.CANCELLED:
-            self.repository.update_status(registration, RegistrationStatus.CANCELLED)
+            cancelled_registration = self.repository.update_status(
+                registration, RegistrationStatus.CANCELLED
+            )
+            self._publish_registration_event(
+                DomainEventType.REGISTRATION_CANCELLED, cancelled_registration
+            )
 
     def get_activity_registration(
         self,
@@ -317,5 +358,6 @@ class RegistrationService:
 
 def get_registration_service(
     repository: RegistrationRepository = Depends(get_registration_repository),
+    event_publisher: SnsEventPublisher = Depends(get_sns_event_publisher),
 ) -> RegistrationService:
-    return RegistrationService(repository)
+    return RegistrationService(repository, event_publisher)

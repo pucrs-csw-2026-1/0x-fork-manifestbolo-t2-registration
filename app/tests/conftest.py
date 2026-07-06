@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.postgres import PostgresContainer
 
 from main import app
+from src.config import get_settings
 from src.database import Base, get_db
 
 # Ensure app root is importable regardless of where pytest is executed from.
@@ -78,18 +79,29 @@ def db_session(pg_engine: Engine) -> Generator[Session, None, None]:
 
 
 @pytest.fixture()
-def client(db_session: Session) -> Generator[TestClient, None, None]:
-    """Provide a FastAPI test client with database dependency override."""
+def client(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> Generator[TestClient, None, None]:
+    """Provide a FastAPI test client with database dependency override.
+
+    Wraps the whole client lifetime in `mock_aws()` so any boto3 call made
+    during a request (e.g. the SNS publisher) hits moto instead of a real
+    endpoint. `AWS_ENDPOINT_URL` is cleared because moto does not intercept
+    calls that pass an explicit `endpoint_url` pointing at a real host.
+    """
 
     def _override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = _override_get_db
+    monkeypatch.setenv("AWS_ENDPOINT_URL", "")
+    get_settings.cache_clear()
     try:
-        with TestClient(app) as test_client:
+        with mock_aws(), TestClient(app) as test_client:
             yield test_client
     finally:
         app.dependency_overrides.clear()
+        get_settings.cache_clear()
 
 
 # ---------------------------------------------------------------------------

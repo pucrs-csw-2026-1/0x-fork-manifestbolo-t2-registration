@@ -198,3 +198,60 @@ ruff format --check .
 ```
 
 A pipeline do GitHub Actions roda `ruff check app/ --output-format=github` e falha o build se houver qualquer erro — então é mais rápido corrigir localmente antes de pushar.
+
+---
+
+## Infraestrutura e Publicação de Eventos
+
+Este serviço publica eventos de domínio (`RegistrationConfirmed`, `RegistrationCancelled`) em um tópico SNS via o publisher em [`app/src/domain/notifications/`](./app/src/domain/notifications/), e persiste dados em um RDS Postgres provisionado pelo módulo Terraform em [`app/infra/terraform/rds/`](./app/infra/terraform/rds/). Ambos dependem de uma Ministack (LocalStack-compatible) **compartilhada** com o restante da plataforma — não é a mesma instância isolada que outros forks podem rodar localmente. Ver [ADR-0002](./app/documentation/adrs/0002-publicacao-eventos-dominio-sns.md) para o racional das decisões de design do publisher.
+
+### Checklist de PR — validação ponta a ponta da publicação de eventos
+
+Antes de considerar uma alteração no publisher SNS (ou em `confirm`/`cancel_registration`) pronta para merge, além dos testes automatizados (que mockam o SNS via `moto`), confirme manualmente que o consumidor real processa a mensagem:
+
+- [ ] Suba os três serviços simultaneamente: este fork (`manifestbolo-t2-registration`), o serviço de Metrics (`0x_t2`) e a Ministack compartilhada — os três precisam estar no ar ao mesmo tempo; isso não é reproduzível apenas com os testes automatizados deste repositório.
+- [ ] Dispare uma confirmação ou cancelamento real via API deste serviço (ex.: `POST /events/confirmation/{confirmation_id}` ou `DELETE /events/{event_id}/guests/{user_id}`).
+- [ ] No Metrics (`0x_t2`), chame `GET /admin/dlq/messages` com um token admin e confirme que a mensagem publicada **não aparece** na dead-letter queue.
+- [ ] Se a mensagem cair na DLQ, não marque a US/PR como concluída — investigue primeiro se o `resource_ref` (formato `"{event_id}:{user_id}"`, sem UUID único de inscrição — ver ADR-0002) está no formato que o Metrics espera antes de prosseguir.
+
+### Terraform — validação local
+
+O binário do Terraform não faz parte das dependências do projeto (não há gerenciador de versão configurado neste repo). Para validar o módulo `app/infra/terraform/rds/` sem alterar nenhum recurso:
+
+```bash
+cd app/infra/terraform/rds
+terraform init
+terraform validate
+terraform fmt -check -diff
+```
+
+`terraform plan`/`terraform apply` exigem a Ministack acessível em `ministack_endpoint` (`terraform.tfvars`, copiado a partir de `terraform.tfvars.example`). O default do módulo é `http://host.docker.internal:4566`, pensado para quando o Terraform roda **de dentro de um container** (CI, outro serviço em Docker) que precisa alcançar o host. Se você está rodando `terraform` **diretamente na sua máquina** (fora de qualquer container), `host.docker.internal` não resolve — use `http://localhost:4566` em `terraform.tfvars` nesse caso (validado neste ambiente: a Ministack respondia em `localhost:4566`, e `host.docker.internal:4566` não teve resposta a partir do host).
+
+### ⚠️ Limitação conhecida da Ministack: porta interna vs. porta publicada no host
+
+Ao rodar `terraform apply` neste módulo, a Ministack cria um container Postgres real para simular o RDS. O output `database_url` (e o output `db_port`) que o Terraform devolve reporta a **porta interna do container** (`5432` — a porta que o Postgres escuta *dentro* da rede Docker da Ministack), **não** a porta real publicada no host da sua máquina. Essa é uma limitação da própria API da Ministack ao emular `aws_db_instance`, não algo corrigível neste módulo Terraform — a mesma limitação já havia sido observada e documentada no fork `avengers`.
+
+Isso significa que **não dá para usar `terraform output -raw database_url` diretamente no `.env`** — a conexão vai falhar (ou pior, silenciosamente conectar em outra coisa na mesma porta interna). Depois de rodar `terraform apply`, é necessário descobrir manualmente a porta real:
+
+```bash
+# 1. Aplique o módulo normalmente
+cd app/infra/terraform/rds
+terraform apply -auto-approve
+
+# 2. Encontre o container Postgres que a Ministack criou para este RDS
+#    (o nome segue o padrão ministack-rds-<identifier>-db; identifier = "registration-db" em main.tf)
+docker ps --format "{{.Names}}\t{{.Image}}\t{{.Ports}}" | grep registration
+
+# 3. Confirme a porta REAL publicada no host
+docker port ministack-rds-registration-db
+# 5432/tcp -> 0.0.0.0:<porta-real>   <- use essa porta, não a do terraform output
+
+# 4. Monte DATABASE_URL manualmente no .env usando host localhost + a porta real
+#    (não host.docker.internal, e não a porta 5432 do terraform output)
+DATABASE_URL=postgresql+psycopg2://<user>:<password>@localhost:<porta-real>/app_db
+
+# 5. Rode as migrations contra a porta real
+alembic upgrade head
+```
+
+Verificado empiricamente neste ambiente: `terraform output` reportou `db_port = 5432`, mas `docker port ministack-rds-registration-db` mostrou a porta real publicada como `15433`. A migration completou com sucesso (`alembic upgrade head`) apontando para `localhost:15433`, criando as 5 tabelas esperadas (`activity_registrations`, `alembic_version`, `authentication_tokens`, `health_log`, `registrations`).

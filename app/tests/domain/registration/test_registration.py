@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import boto3
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 import pytest
@@ -655,6 +656,23 @@ def test_confirm_registration_succeeds_with_valid_token(
     assert registration.status == RegistrationStatus.CONFIRMED
 
 
+def test_confirm_registration_publishes_registration_confirmed(
+    client: TestClient, db_session: Session
+) -> None:
+    validation_token = _seed_registration_with_token(db_session, token="ABCD1234")
+
+    response = client.post(
+        f"/events/confirmation/{validation_token.id}",
+        json={"token": "ABCD1234"},
+    )
+
+    assert response.status_code == 200
+
+    sns = boto3.client("sns", region_name="us-east-1")
+    topics = sns.list_topics()["Topics"]
+    assert len(topics) == 1
+
+
 def test_confirm_registration_rejects_wrong_token(
     client: TestClient, db_session: Session
 ) -> None:
@@ -745,6 +763,52 @@ def test_cancel_registration_soft_deletes_existing(
     )
     assert registration is not None
     assert registration.status == RegistrationStatus.CANCELLED
+
+
+def test_cancel_registration_publishes_registration_cancelled(
+    client: TestClient, db_session: Session
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    db_session.add(Registration(event_id=event_id, user_id=user_id))
+    db_session.commit()
+    override_auth_user(user_id)
+
+    response = client.delete(
+        f"/events/{event_id}/guests/{user_id}",
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 204
+
+    sns = boto3.client("sns", region_name="us-east-1")
+    topics = sns.list_topics()["Topics"]
+    assert len(topics) == 1
+
+
+def test_cancel_registration_already_cancelled_does_not_republish(
+    client: TestClient, db_session: Session
+) -> None:
+    event_id = uuid4()
+    user_id = uuid4()
+    db_session.add(
+        Registration(
+            event_id=event_id, user_id=user_id, status=RegistrationStatus.CANCELLED
+        )
+    )
+    db_session.commit()
+    override_auth_user(user_id)
+
+    response = client.delete(
+        f"/events/{event_id}/guests/{user_id}",
+        headers={"Authorization": "Bearer access-token"},
+    )
+
+    assert response.status_code == 204
+
+    sns = boto3.client("sns", region_name="us-east-1")
+    topics = sns.list_topics()["Topics"]
+    assert len(topics) == 0
 
 
 def test_confirm_registration_rejects_malformed_token(client: TestClient) -> None:

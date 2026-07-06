@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     AUTH_SERVICE_BASE_URL: str = "http://localhost:8080"
     EVENTS_SERVICE_BASE_URL: str = "http://localhost:3000"
 
+    SNS_REGISTRATION_TOPIC_NAME: str = "registration-events"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -10,3 +10,18 @@ htmlcov/
 .env
 .vscode/
 .idea/
+
+# Terraform local execution artifacts (not the lock file — that stays versioned)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+!terraform.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
