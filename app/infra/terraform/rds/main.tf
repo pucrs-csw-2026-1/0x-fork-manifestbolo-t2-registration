@@ -11,4 +11,12 @@ resource "aws_db_instance" "registration" {
   publicly_accessible = true
   skip_final_snapshot = true
   apply_immediately   = true
+
+  lifecycle {
+    # A Ministack (LocalStack) popula `max_allocated_storage` na instancia, gerando
+    # um diff perpetuo (20 -> null) que trava o `terraform apply` de reconciliacao
+    # num ModifyDBInstance nao completado pelo emulador. Ignorar mantem o
+    # `docker compose up` idempotente (re-apply vira no-op) sem afetar o create.
+    ignore_changes = [max_allocated_storage]
+  }
 }

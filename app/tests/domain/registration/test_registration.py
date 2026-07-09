@@ -1,6 +1,7 @@
 """Tests for event registration."""
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import boto3
@@ -15,6 +16,7 @@ from src.domain.auth.client import get_auth_client
 from src.domain.auth.schemas import UserResponse
 from src.domain.events.client import get_events_client
 from src.domain.events.schemas import ActivityResponse, EventResponse
+from src.domain.notifications.schemas import DomainEvent, DomainEventType
 from src.domain.registration.enums import RegistrationStatus
 from src.domain.registration.model import (
     ActivityRegistration,
@@ -671,6 +673,42 @@ def test_confirm_registration_publishes_registration_confirmed(
     sns = boto3.client("sns", region_name="us-east-1")
     topics = sns.list_topics()["Topics"]
     assert len(topics) == 1
+
+
+def test_registration_event_carries_domain_data_payload() -> None:
+    """US-08: a notificação leva o payload de domínio em `data` (sem callback)."""
+    captured: list[DomainEvent] = []
+
+    class _CapturingPublisher:
+        def publish(self, event: DomainEvent) -> None:
+            captured.append(event)
+
+    service = RegistrationService(MagicMock(), _CapturingPublisher())  # type: ignore[arg-type]
+    event_id = uuid4()
+    user_id = uuid4()
+    registration = Registration(
+        event_id=event_id,
+        user_id=user_id,
+        status=RegistrationStatus.CONFIRMED,
+    )
+    registration.created_at = datetime(2026, 6, 1, tzinfo=UTC)
+    registration.updated_at = datetime(2026, 6, 2, tzinfo=UTC)
+
+    service._publish_registration_event(
+        DomainEventType.REGISTRATION_CONFIRMED, registration
+    )
+
+    assert len(captured) == 1
+    event = captured[0]
+    assert event.event_type == DomainEventType.REGISTRATION_CONFIRMED
+    assert event.version == "1.0"
+    assert event.data == {
+        "event_id": str(event_id),
+        "attendant_id": str(user_id),
+        "registration_id": f"{event_id}:{user_id}",
+        "registered_at": "2026-06-01T00:00:00+00:00",
+        "confirmed_at": "2026-06-02T00:00:00+00:00",
+    }
 
 
 def test_confirm_registration_rejects_wrong_token(

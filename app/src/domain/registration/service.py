@@ -44,11 +44,25 @@ class RegistrationService:
         if self.event_publisher is None:
             return
 
+        # Payload de domínio (US-08, ADR-0009 do Metrics): o consumidor monta o
+        # attendant a partir do próprio `data`, sem callback HTTP a esta API.
+        data = {
+            "event_id": str(registration.event_id),
+            "attendant_id": str(registration.user_id),
+            "registration_id": f"{registration.event_id}:{registration.user_id}",
+            "registered_at": registration.created_at.isoformat(),
+            "confirmed_at": (
+                registration.updated_at.isoformat()
+                if registration.updated_at is not None
+                else None
+            ),
+        }
         domain_event = DomainEvent(
             event_id=registration.event_id,
             event_type=event_type,
             source=REGISTRATION_TOPIC_SOURCE,
             resource_ref=f"{registration.event_id}:{registration.user_id}",
+            data=data,
         )
         self.event_publisher.publish(domain_event)
 
