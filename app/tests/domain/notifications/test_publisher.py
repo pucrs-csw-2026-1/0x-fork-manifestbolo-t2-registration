@@ -13,6 +13,19 @@ from src.domain.notifications.publisher import SnsEventPublisher
 from src.domain.notifications.schemas import DomainEvent, DomainEventType
 
 
+@pytest.fixture(autouse=True)
+def _clear_aws_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure @mock_aws clients hit moto in-memory, not a real endpoint.
+
+    The Tests workflow injects ``AWS_ENDPOINT_URL=http://localhost:4566`` and
+    boto3 honors it globally, but moto does not intercept calls carrying an
+    explicit endpoint_url pointing at a real host, so the clients would try to
+    reach an absent LocalStack. Clearing it here mirrors the ``client`` fixture
+    in ``conftest.py``.
+    """
+    monkeypatch.delenv("AWS_ENDPOINT_URL", raising=False)
+
+
 def _sample_event() -> DomainEvent:
     return DomainEvent(
         event_id=uuid4(),
