@@ -4,20 +4,21 @@ from logging.config import fileConfig
 from pathlib import Path
 import sys
 
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+
 # Ensure app root is on sys.path before importing application modules.
 APP_ROOT = Path(__file__).resolve().parent.parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
-from alembic import context
-from sqlalchemy import engine_from_config, pool
 
-from src.config import get_settings
-from src.database import Base
-from src.domain.health.model import HealthLog
-from src.domain.registration.model import Registration
+from src.config import get_settings  # noqa: E402
+from src.database import Base  # noqa: E402
+from src.domain.health.model import HealthLog  # noqa: E402
+from src.domain.registration.model import Registration, ActivityRegistration  # noqa: E402
 
-MODEL_TYPES = (HealthLog, Registration)
+MODEL_TYPES = (HealthLog, Registration, ActivityRegistration)
 
 config = context.config
 settings = get_settings()

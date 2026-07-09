@@ -1,0 +1,76 @@
+# US-08: um `docker compose up` sobe o Registration fork contra a Ministack
+# COMPARTILHADA (auth-infra) e o Auth T1. O Postgres é REAL, provisionado via
+# RDS da Ministack (sobe um container `ministack-rds-registration-db` na mesma
+# rede, alcançável por nome — sem docker-port). O próprio app roda as migrations
+# Alembic no boot (CMD do Dockerfile: `alembic upgrade head && uvicorn ...`).
+#
+# Pré-requisitos: a stack do T1 no ar (auth-infra + auth-backend na rede
+# `auth-service_default`) e a Ministack com o docker.sock montado (RDS real).
+# Ordem de subida: T1 -> T2 -> forks.
+name: registration-fork
+
+networks:
+  ministack:
+    name: auth-service_default
+    external: true
+
+services:
+  # Provisiona o Postgres (RDS) na Ministack compartilhada — idempotente.
+  db-setup:
+    image: hashicorp/terraform:1.9
+    working_dir: /workspace
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        ok=0
+        for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+          if wget -q -O - http://auth-infra:4566/_ministack/health >/dev/null 2>&1; then ok=1; break; fi
+          echo "aguardando a Ministack (auth-infra:4566)..."; sleep 2
+        done
+        [ "$$ok" = 1 ] || { echo "ERRO: Ministack indisponivel em auth-infra:4566 (suba o T1 antes)"; exit 1; }
+        rm -rf .terraform
+        terraform init -input=false
+        terraform apply -auto-approve -input=false
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      TF_IN_AUTOMATION: '1'
+      TF_VAR_ministack_endpoint: http://auth-infra:4566
+      TF_VAR_db_password: postgres
+    volumes:
+      - ./app/infra/terraform/rds:/workspace
+    networks: [ministack]
+
+  # FastAPI + SQLAlchemy. Aplica as migrations Alembic no boot (CMD do Dockerfile)
+  # e sobe o uvicorn. Conecta ao Postgres do RDS pelo NOME do container.
+  app:
+    build: ./app
+    container_name: registration-api
+    ports:
+      - '3001:8000'
+    # Espera o Postgres do RDS aceitar conexao, aplica as migrations Alembic e
+    # sobe o uvicorn (sobrepoe o CMD do Dockerfile so para adicionar a espera).
+    command:
+      - sh
+      - -c
+      - |
+        for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+          if python -c "import socket,sys; s=socket.socket(); s.settimeout(2); sys.exit(0 if s.connect_ex(('ministack-rds-registration-db',5432))==0 else 1)" 2>/dev/null; then break; fi
+          echo "aguardando Postgres (ministack-rds-registration-db:5432)..."; sleep 2
+        done
+        alembic upgrade head
+        uvicorn main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@ministack-rds-registration-db:5432/app_db
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://auth-infra:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AUTH_SERVICE_BASE_URL: http://auth-backend:8080
+      EVENTS_SERVICE_BASE_URL: http://events-api:3000
+      SNS_REGISTRATION_TOPIC_NAME: registration-events
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+    networks: [ministack]

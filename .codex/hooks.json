@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROMPT_LOG_SOURCE=codex bash \"$(git rev-parse --show-toplevel)/.ai_log/log_prompts.sh\"",
+            "timeout": 5,
+            "statusMessage": "Logging prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROMPT_LOG_SOURCE=codex bash \"$(git rev-parse --show-toplevel)/.ai_log/log_prompts.sh\"",
+            "timeout": 5,
+            "statusMessage": "Logging response"
+          }
+        ]
+      }
+    ]
+  }
+}

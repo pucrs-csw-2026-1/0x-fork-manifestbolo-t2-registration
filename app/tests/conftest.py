@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.postgres import PostgresContainer
 
 from main import app
+from src.config import get_settings
 from src.database import Base, get_db
 
 # Ensure app root is importable regardless of where pytest is executed from.
@@ -42,6 +43,7 @@ def pg_engine() -> Generator[Engine, None, None]:
 # ---------------------------------------------------------------------------
 # Isolated session — each test runs inside a transaction that is rolled back.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def db_session(pg_engine: Engine) -> Generator[Session, None, None]:
@@ -75,30 +77,37 @@ def db_session(pg_engine: Engine) -> Generator[Session, None, None]:
 # FastAPI test client with DB override.
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
-def client(db_session: Session, pg_engine: Engine) -> Generator[TestClient, None, None]:
-    """Provide a FastAPI test client with database dependency override."""
-    import main as main_module
 
-    test_session_factory = sessionmaker(bind=pg_engine, autocommit=False, autoflush=False)
-    original_session_local = main_module.SessionLocal
-    main_module.SessionLocal = test_session_factory
+@pytest.fixture()
+def client(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> Generator[TestClient, None, None]:
+    """Provide a FastAPI test client with database dependency override.
+
+    Wraps the whole client lifetime in `mock_aws()` so any boto3 call made
+    during a request (e.g. the SNS publisher) hits moto instead of a real
+    endpoint. `AWS_ENDPOINT_URL` is cleared because moto does not intercept
+    calls that pass an explicit `endpoint_url` pointing at a real host.
+    """
 
     def _override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = _override_get_db
+    monkeypatch.setenv("AWS_ENDPOINT_URL", "")
+    get_settings.cache_clear()
     try:
-        with TestClient(app) as test_client:
+        with mock_aws(), TestClient(app) as test_client:
             yield test_client
     finally:
         app.dependency_overrides.clear()
-        main_module.SessionLocal = original_session_local
+        get_settings.cache_clear()
 
 
 # ---------------------------------------------------------------------------
 # AWS mock
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def aws_mock() -> Generator[None, None, None]:
@@ -110,6 +119,7 @@ def aws_mock() -> Generator[None, None, None]:
 # ---------------------------------------------------------------------------
 # Faker — randomized test data for each test run.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def fake() -> Faker:
