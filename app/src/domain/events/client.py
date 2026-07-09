@@ -4,7 +4,7 @@ import logging
 from typing import Any, TypeVar
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 import httpx
 from pydantic import BaseModel
 
@@ -36,11 +36,14 @@ class EventsClient:
         timeout: float = 5.0,
         transport: httpx.BaseTransport | None = None,
         settings: Settings | None = None,
+        access_token: str | None = None,
     ) -> None:
         app_settings = settings or get_settings()
         self._base_url = base_url or app_settings.EVENTS_SERVICE_BASE_URL
         self._timeout = timeout
         self._transport = transport
+        # US-08: Bearer do chamador, repassado ao Events service (rotas autenticadas).
+        self._access_token = access_token
 
     def list_events(self, page: int = 1, limit: int = 20) -> EventListResponse:
         response = self._request(
@@ -98,6 +101,11 @@ class EventsClient:
         allow_not_found: bool = False,
         **kwargs: Any,
     ) -> httpx.Response:
+        if self._access_token:
+            kwargs["headers"] = {
+                **kwargs.pop("headers", {}),
+                "Authorization": f"Bearer {self._access_token}",
+            }
         try:
             with httpx.Client(
                 base_url=self._base_url,
@@ -159,8 +167,17 @@ class EventsClient:
 
 
 def get_events_client(
+    request: Request,
     settings: Settings = Depends(get_settings),
 ) -> EventsClient:
-    """Return an Events client instance for FastAPI dependency injection."""
+    """Return an Events client instance for FastAPI dependency injection.
 
-    return EventsClient(settings=settings)
+    US-08: extrai o Bearer da requisição e o repassa ao Events service, cujas
+    rotas exigem autenticação (validação de evento na inscrição, etc.).
+    """
+
+    auth_header = request.headers.get("authorization") or ""
+    access_token = (
+        auth_header[7:] if auth_header.lower().startswith("bearer ") else None
+    )
+    return EventsClient(settings=settings, access_token=access_token)
